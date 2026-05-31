@@ -44,9 +44,9 @@ export function Sidebar() {
       <div className="px-4 pb-4">
         <button
           onClick={() => navigate("home")}
-          className="w-full flex items-center justify-center gap-2 bg-primary text-on-primary rounded-full py-2.5 font-headline-md text-headline-md transition-all hover:bg-inverse-surface active:scale-[0.98]"
+          className="group w-full flex items-center justify-center gap-2 bg-primary text-on-primary rounded-full py-2.5 font-headline-md text-headline-md shadow-sm transition-all duration-300 ease-out hover:bg-inverse-surface hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
         >
-          <Icon name="add" size={18} />
+          <Icon name="add" size={18} className="transition-transform duration-300 group-hover:rotate-90" />
           New Prototype
         </button>
       </div>
@@ -59,13 +59,24 @@ export function Sidebar() {
             <button
               key={item.route}
               onClick={() => navigate(item.route)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-full text-left transition-all active:scale-[0.98] ${
+              className={`group relative flex w-full items-center gap-3 rounded-full px-3 py-2 text-left transition-all duration-300 ease-out active:scale-[0.98] ${
                 active
                   ? "bg-surface-container text-primary font-semibold"
-                  : "text-text-muted hover:bg-surface-container hover:text-text-secondary"
+                  : "text-text-muted hover:translate-x-0.5 hover:bg-surface-container/60 hover:text-text-secondary"
               }`}
             >
-              <Icon name={item.icon} size={20} fill={active} />
+              {/* Animated active accent bar */}
+              <span
+                className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary transition-transform duration-300 ease-out ${
+                  active ? "scale-y-100" : "scale-y-0"
+                }`}
+              />
+              <Icon
+                name={item.icon}
+                size={20}
+                fill={active}
+                className="transition-transform duration-300 ease-out group-hover:scale-110"
+              />
               <span className="font-body-md text-body-md">{item.label}</span>
             </button>
           );
@@ -77,7 +88,7 @@ export function Sidebar() {
         {FOOTER.map((item) => (
           <a
             key={item.label}
-            className="flex items-center gap-3 px-3 py-2 rounded-full text-text-muted hover:bg-surface-container transition-colors cursor-pointer"
+            className="flex items-center gap-3 px-3 py-2 rounded-full text-text-muted hover:bg-surface-container hover:translate-x-0.5 transition-all duration-300 ease-out cursor-pointer"
           >
             <Icon name={item.icon} size={20} />
             <span className="font-label-sm text-label-sm">{item.label}</span>

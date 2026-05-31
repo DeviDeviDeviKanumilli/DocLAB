@@ -1,7 +1,30 @@
+import type { CSSProperties } from "react";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { Badge } from "../components/Badge";
 import { useRouter } from "../router";
+import { useCountUp } from "../hooks/useCountUp";
+
+/** Animated metric value: counts up from 0 on mount. */
+function CountValue({
+  target,
+  decimals = 0,
+  suffix = "",
+  delay = 0,
+}: {
+  target: number;
+  decimals?: number;
+  suffix?: string;
+  delay?: number;
+}) {
+  const v = useCountUp(target, { decimals, delay });
+  return (
+    <span>
+      {v}
+      {suffix}
+    </span>
+  );
+}
 
 const SUMMARY = [
   { label: "Model family", value: "Gradient-boosted trees" },
@@ -44,8 +67,21 @@ function MiniChart({ kind }: { kind: "loss" | "pr" }) {
       {[16, 32, 48].map((y) => (
         <line key={y} x1="0" y1={y} x2="200" y2={y} stroke="#e5e5e5" strokeWidth="1" />
       ))}
-      <path d={`${path} L196,64 L4,64 Z`} fill={`url(#g-${kind})`} />
-      <path d={path} fill="none" stroke="#171717" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d={`${path} L196,64 L4,64 Z`}
+        fill={`url(#g-${kind})`}
+        className="animate-fade-in"
+        style={{ animationDelay: "0.9s", opacity: 0, animationFillMode: "forwards" }}
+      />
+      <path
+        d={path}
+        fill="none"
+        stroke="#171717"
+        strokeWidth="2"
+        strokeLinecap="round"
+        className="draw-line"
+        style={{ "--len": 260 } as CSSProperties}
+      />
     </svg>
   );
 }
@@ -87,9 +123,13 @@ export function Results() {
         </div>
 
         {/* Summary strip */}
-        <div className="mb-6 flex flex-wrap gap-x-12 gap-y-4 border-b border-border pb-6">
-          {SUMMARY.map((s) => (
-            <div key={s.label} className="flex flex-col gap-0.5">
+        <div className="stagger mb-6 flex flex-wrap gap-x-12 gap-y-4 border-b border-border pb-6">
+          {SUMMARY.map((s, i) => (
+            <div
+              key={s.label}
+              style={{ "--i": i + 1 } as CSSProperties}
+              className="flex flex-col gap-0.5"
+            >
               <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                 {s.label}
               </div>
@@ -98,12 +138,21 @@ export function Results() {
                   s.mono ? "font-code-sm" : "font-headline-md"
                 }`}
               >
-                {s.value}
+                {s.label === "Accuracy" ? (
+                  <CountValue target={83.1} decimals={1} suffix="%" delay={250} />
+                ) : (
+                  s.value
+                )}
                 {s.delta && (
                   <span className="font-label-sm text-success-text">{s.delta}</span>
                 )}
                 {s.check && (
-                  <Icon name="check_circle" size={18} className="text-success-text" />
+                  <Icon
+                    name="check_circle"
+                    size={18}
+                    className="pop text-success-text"
+                    style={{ animationDelay: "0.5s" } as CSSProperties}
+                  />
                 )}
               </div>
             </div>

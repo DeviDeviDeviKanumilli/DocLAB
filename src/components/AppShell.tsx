@@ -22,7 +22,7 @@ export function AppShell({
       <div className="flex h-screen min-w-0 flex-1 flex-col md:ml-[220px]">
         <TopAppBar title={title} showSearch={showSearch} />
         <main id="doclab-main" className="flex-1 overflow-y-auto">
-          {children}
+          <div className="page-enter min-h-full">{children}</div>
         </main>
         <Disclaimer />
       </div>
