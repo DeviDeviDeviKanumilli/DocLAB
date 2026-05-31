@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { Badge } from "../components/Badge";
+import { useRouter } from "../router";
 import type { Dataset } from "../types/tauri";
 
 const MODALITY_TONE: Record<string, "neutral"> = {
@@ -11,7 +12,14 @@ const MODALITY_TONE: Record<string, "neutral"> = {
   text: "neutral",
 };
 
+/** A goal sentence to seed the Home composer when a dataset is picked. */
+function goalForDataset(d: Dataset): string {
+  if (d.description?.trim()) return d.description.trim();
+  return `Prototype a model using the ${d.name} dataset.`;
+}
+
 export function Datasets() {
+  const { navigate } = useRouter();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +66,16 @@ export function Datasets() {
           {datasets.map((dataset) => (
             <div
               key={dataset.id}
-              className="rounded-lg border border-border bg-surface p-5 transition-all hover:border-border-strong hover:shadow-sm"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate("home", { prefillGoal: goalForDataset(dataset) })}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate("home", { prefillGoal: goalForDataset(dataset) });
+                }
+              }}
+              className="group cursor-pointer rounded-lg border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-border-strong hover:shadow-sm"
             >
               <div className="mb-3 flex items-start justify-between">
                 <h3 className="font-headline-md text-headline-md text-text-primary">
@@ -95,11 +112,19 @@ export function Datasets() {
               </p>
 
               {dataset.limitations && (
-                <details className="font-label-sm text-label-sm text-text-muted">
+                <details
+                  className="font-label-sm text-label-sm text-text-muted"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <summary className="cursor-pointer">Limitations</summary>
                   <p className="mt-2 text-text-secondary">{dataset.limitations}</p>
                 </details>
               )}
+
+              <div className="mt-4 flex items-center justify-end gap-1 border-t border-border pt-3 font-label-sm text-label-sm font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                Use this dataset
+                <Icon name="arrow_forward" size={16} />
+              </div>
             </div>
           ))}
         </div>

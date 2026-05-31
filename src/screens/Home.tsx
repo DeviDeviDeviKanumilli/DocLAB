@@ -38,8 +38,8 @@ const EXAMPLES: Example[] = [
 ];
 
 export function Home() {
-  const { navigate } = useRouter();
-  const [goal, setGoal] = useState("");
+  const { navigate, params } = useRouter();
+  const [goal, setGoal] = useState((params.prefillGoal as string) ?? "");
 
   function start(text: string) {
     const trimmed = text.trim();
