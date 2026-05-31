@@ -2,7 +2,7 @@ mod db;
 mod experiments;
 mod marketplace;
 
-use experiments::{ExperimentDetail, ExperimentSummary, PlanPreview, WorkerPlan};
+use experiments::{AgentArtifacts, ExperimentDetail, ExperimentSummary, PlanPreview, WorkerPlan};
 use marketplace::{Dataset, Marketplace};
 use std::path::PathBuf;
 use std::process::Command;
@@ -57,8 +57,12 @@ fn create_plan(
 }
 
 #[tauri::command]
-fn run_experiment(plan: WorkerPlan, goal_text: String) -> Result<ExperimentDetail, String> {
-    experiments::run_experiment(plan, goal_text)
+fn run_experiment(
+    plan: WorkerPlan,
+    goal_text: String,
+    agent_artifacts: AgentArtifacts,
+) -> Result<ExperimentDetail, String> {
+    experiments::run_experiment(plan, goal_text, agent_artifacts)
 }
 
 #[tauri::command]

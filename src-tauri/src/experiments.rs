@@ -12,6 +12,13 @@ use uuid::Uuid;
 const SCHEMA_VERSION: u8 = 1;
 const DEFAULT_DATASET_ID: &str = "diabetes_readmission";
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentArtifacts {
+    pub intent: String,
+    pub selection: String,
+    pub profile: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerPlan {
     pub schema_version: u8,
@@ -147,7 +154,11 @@ pub fn create_plan(
     })
 }
 
-pub fn run_experiment(plan: WorkerPlan, goal_text: String) -> Result<ExperimentDetail, String> {
+pub fn run_experiment(
+    plan: WorkerPlan,
+    goal_text: String,
+    agent_artifacts: AgentArtifacts,
+) -> Result<ExperimentDetail, String> {
     validate_plan(&plan)?;
 
     let conn = db::open_db()?;
@@ -159,6 +170,9 @@ pub fn run_experiment(plan: WorkerPlan, goal_text: String) -> Result<ExperimentD
             experiment_dir.display()
         )
     })?;
+
+    // Write agent artifacts BEFORE plan.json
+    write_agent_artifacts(&experiment_dir, &agent_artifacts)?;
 
     let plan_path = experiment_dir.join("plan.json");
     let metrics_path = experiment_dir.join("metrics.json");
@@ -497,6 +511,22 @@ fn path_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn write_agent_artifacts(
+    experiment_dir: &Path,
+    artifacts: &AgentArtifacts,
+) -> Result<(), String> {
+    fs::write(experiment_dir.join("intent.json"), &artifacts.intent)
+        .map_err(|e| format!("cannot write intent.json: {e}"))?;
+    fs::write(
+        experiment_dir.join("dataset_selection.json"),
+        &artifacts.selection,
+    )
+    .map_err(|e| format!("cannot write dataset_selection.json: {e}"))?;
+    fs::write(experiment_dir.join("data_profile.json"), &artifacts.profile)
+        .map_err(|e| format!("cannot write data_profile.json: {e}"))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,7 +678,13 @@ mod tests {
             local_csv: Some(path_string(&fixture)),
         };
 
-        let detail = run_experiment(plan, "Smoke-test readmission fixture".to_string()).unwrap();
+        let artifacts = AgentArtifacts {
+            intent: r#"{"task_type":"predict","modality":"tabular","metric_hint":"accuracy","goal_text":"Smoke-test readmission fixture"}"#.to_string(),
+            selection: r#"{"dataset_id":"tiny_fixture","dataset_name":"Tiny Fixture","rationale":"Test dataset"}"#.to_string(),
+            profile: r#"{"schema":["feature_1","feature_2","label"],"label_column":"readmitted","row_count":120,"missing_percent":0.0}"#.to_string(),
+        };
+
+        let detail = run_experiment(plan, "Smoke-test readmission fixture".to_string(), artifacts).unwrap();
         assert_eq!(detail.status, "complete");
         assert!(detail.metric_value.is_some());
         assert!(detail.metrics_path.is_some());

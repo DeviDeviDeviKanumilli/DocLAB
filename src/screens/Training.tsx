@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
+import type { ExperimentDetail } from "../types/tauri";
 
 interface Step {
   title: string;
@@ -9,55 +11,81 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { title: "Dataset selected", detail: "Curated readmission dataset mapped from the registry." },
-  { title: "Dataset inspected", detail: "45,210 viable records. Missing values flagged in 3 columns." },
+  { title: "Dataset selected", detail: "Curated dataset loaded from registry." },
+  { title: "Dataset inspected", detail: "Schema validated, missing values flagged." },
   { title: "Data prepared", detail: "Numeric features scaled; categorical variables encoded." },
-  { title: "Train / eval / test split", detail: "80% / 10% / 10% stratified split, fixed seed 42." },
+  { title: "Train / eval / test split", detail: "80% / 10% / 10% stratified split, fixed seed." },
   { title: "Model training", detail: "Fitting gradient-boosted decision trees." },
   { title: "Evaluation", detail: "Scoring on held-out test set vs. majority baseline." },
   { title: "Best checkpoint saved", detail: "Highest-scoring model persisted to the experiment." },
   { title: "Model card generated", detail: "Doctor-facing summary written with limitations & risks." },
 ];
 
-const LOG = `[10:42:01] INFO  Initializing local training environment (CPU)...
-[10:42:02] INFO  Loading curated dataset mimic-iv-readmission (45,210 rows)
-[10:42:05] WARN  124 missing values in 'bp_systolic' — imputing with median
-[10:42:06] INFO  Preprocessing complete. Encoding 11 categorical columns
-[10:42:06] INFO  Stratified split 0.8 / 0.1 / 0.1 (seed=42)
-[10:42:07] INFO  Training gradient-boosted trees: n_estimators=200, max_depth=6
-[10:42:11] INFO  Fold metrics stabilizing — val accuracy 0.842
-[10:42:14] INFO  Evaluating on test set...
-[10:42:15] INFO  Test accuracy 0.831 | majority-class baseline 0.812
-[10:42:15] INFO  Saving best checkpoint + writing model_card.md`;
-
 export function Training() {
   const { params, navigate } = useRouter();
+  const experimentId = params.experimentId as string;
   const goal = (params.goal as string) ?? "Predict hospital readmission risk";
-  const [progress, setProgress] = useState(0);
+  const [detail, setDetail] = useState<ExperimentDetail | null>(null);
   const [logOpen, setLogOpen] = useState(true);
-  const logRef = useRef<HTMLPreElement>(null);
-
-  // Simulate a short, deterministic training run so the demo flows end-to-end.
-  useEffect(() => {
-    const id = setInterval(() => {
-      setProgress((p) => Math.min(100, p + 2));
-    }, 90);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [progress]);
+    if (!experimentId) {
+      navigate("home");
+      return;
+    }
 
-  // 4 prep steps are pre-done; training is step index 4; the rest unlock as progress completes.
-  const trainingDone = progress >= 100;
-  const activeIndex = trainingDone ? STEPS.length : 4;
+    // Poll every 2 seconds until complete or failed
+    const poll = setInterval(async () => {
+      try {
+        const exp = await invoke<ExperimentDetail>("get_experiment", { id: experimentId });
+        setDetail(exp);
+        if (exp.status === "complete" || exp.status === "failed") {
+          clearInterval(poll);
+          if (exp.status === "complete") {
+            // Auto-navigate to Results after 1 second
+            setTimeout(() => navigate("results", { experimentId }), 1000);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll experiment:", e);
+      }
+    }, 2000);
+
+    // Initial fetch
+    invoke<ExperimentDetail>("get_experiment", { id: experimentId })
+      .then(setDetail)
+      .catch(console.error);
+
+    return () => clearInterval(poll);
+  }, [experimentId, navigate]);
+
+  if (!detail) {
+    return (
+      <AppShell title="Training">
+        <div className="flex h-full items-center justify-center">
+          <div className="text-center">
+            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-primary" />
+            <p className="font-headline-md text-headline-md text-text-primary">
+              Loading experiment...
+            </p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const trainingDone = detail.status === "complete";
+  const trainingFailed = detail.status === "failed";
+  const activeIndex = trainingDone ? STEPS.length : trainingFailed ? 4 : 4;
 
   function stateOf(i: number): "done" | "active" | "todo" {
+    if (trainingFailed && i === 4) return "active";
     if (i < activeIndex) return "done";
     if (i === activeIndex) return "active";
     return "todo";
   }
+
+  const logs = detail.workerStdout || "";
 
   return (
     <AppShell title="Training">
@@ -65,15 +93,15 @@ export function Training() {
         <div className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="mb-1 font-headline-lg text-headline-lg text-primary">
-              Training in progress
+              {trainingDone ? "Training complete" : trainingFailed ? "Training failed" : "Training in progress"}
             </h2>
             <p className="font-body-md text-text-muted">
-              Autonomous prototype run for: {goal}.
+              {trainingFailed ? `Error: ${detail.errorMessage}` : `Autonomous prototype run for: ${goal}.`}
             </p>
           </div>
           {trainingDone && (
             <button
-              onClick={() => navigate("results", { goal })}
+              onClick={() => navigate("results", { experimentId })}
               className="flex items-center gap-2 rounded bg-primary px-5 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-all hover:bg-inverse-surface active:scale-[0.98] animate-fade-in"
             >
               View Results
@@ -115,20 +143,6 @@ export function Training() {
                         {step.detail}
                       </p>
                     )}
-                    {state === "active" && i === 4 && !trainingDone && (
-                      <div className="mt-3 w-full max-w-2xl rounded border border-border bg-surface-muted p-4">
-                        <div className="mb-2 flex items-center justify-between font-label-sm text-text-secondary">
-                          <span>Fitting trees</span>
-                          <span>{progress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
-                          <div
-                            className="h-1.5 rounded-full bg-primary transition-[width] duration-150 ease-out"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -156,15 +170,43 @@ export function Training() {
             />
           </button>
           {logOpen && (
-            <pre
-              ref={logRef}
-              className="h-64 overflow-y-auto whitespace-pre-wrap bg-log-bg p-4 font-code-sm text-code-sm text-log-text"
-            >
-              {LOG}
-              {!trainingDone && <span className="animate-pulse">{"\n_"}</span>}
+            <pre className="h-64 overflow-y-auto whitespace-pre-wrap bg-log-bg p-4 font-code-sm text-code-sm text-log-text">
+              {logs || "Waiting for worker output..."}
+              {!trainingDone && !trainingFailed && <span className="animate-pulse">{"\n_"}</span>}
             </pre>
           )}
         </div>
+
+        {trainingFailed && (
+          <div className="mt-6 rounded-lg border border-error bg-error-bg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="error" className="text-error" />
+              <h3 className="font-headline-md text-headline-md text-error">
+                Training Failed
+              </h3>
+            </div>
+            <p className="font-body-md text-text-primary mb-4">
+              Error code: {detail.errorCode || "unknown"}
+            </p>
+            <p className="font-body-md text-text-secondary">
+              {detail.errorMessage || "Worker failed without error details"}
+            </p>
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => navigate("home")}
+                className="rounded border border-border bg-surface px-4 py-2 font-body-md text-text-primary transition-colors hover:bg-surface-muted"
+              >
+                Start Over
+              </button>
+              <button
+                onClick={() => navigate("experiments")}
+                className="rounded border border-border bg-surface px-4 py-2 font-body-md text-text-primary transition-colors hover:bg-surface-muted"
+              >
+                View History
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );

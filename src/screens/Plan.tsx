@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
+import { runAgent, type AgentResult } from "../agent";
+import type { ExperimentDetail } from "../types/tauri";
 
 const STEPS = [
   { label: "Goal", icon: "check_circle", state: "done" },
@@ -10,20 +13,93 @@ const STEPS = [
   { label: "Evaluation", icon: "analytics", state: "todo" },
 ] as const;
 
-const LOG_LINES = [
-  { tag: "OK", text: 'Parsed intent: "predict readmission risk"' },
-  { tag: "OK", text: "Queried curated dataset registry: 1 match found" },
-  {
-    tag: "OK",
-    text: "Evaluated candidates: logistic regression, random forest, gradient-boosted trees",
-  },
-  { tag: ">", text: "Plan finalized — awaiting your confirmation..." },
-];
-
 export function Plan() {
   const { params, navigate } = useRouter();
-  const [confirmed, setConfirmed] = useState(false);
   const goal = (params.goal as string) ?? "Predict hospital readmission risk";
+  const [agentResult, setAgentResult] = useState<AgentResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    runAgent(goal)
+      .then(setAgentResult)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [goal]);
+
+  async function startTraining() {
+    if (!agentResult) return;
+    setStarting(true);
+    try {
+      const experimentDetail = await invoke<ExperimentDetail>("run_experiment", {
+        plan: agentResult.planPreview.plan,
+        goalText: goal,
+        agentArtifacts: {
+          intent: JSON.stringify(agentResult.intent),
+          selection: JSON.stringify(agentResult.selection),
+          profile: JSON.stringify(agentResult.profile),
+        },
+      });
+      navigate("training", { experimentId: experimentDetail.id });
+    } catch (e: any) {
+      setError(e.message || "Failed to start experiment");
+      setStarting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <AppShell title="Planning...">
+        <div className="flex h-full items-center justify-center">
+          <div className="text-center">
+            <Icon name="model_training" size={48} className="mx-auto mb-4 animate-pulse text-primary" />
+            <p className="font-headline-md text-headline-md text-text-primary">
+              Agent analyzing goal...
+            </p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppShell title="Plan">
+        <div className="mx-auto max-w-[720px] p-8">
+          <div className="rounded-lg border border-error bg-error-bg p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Icon name="error" className="text-error" />
+              <h3 className="font-headline-md text-headline-md text-error">
+                Agent Error
+              </h3>
+            </div>
+            <p className="mb-4 font-body-md text-text-primary">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded border border-border bg-surface px-4 py-2 font-body-md text-text-primary transition-colors hover:bg-surface-muted"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (!agentResult) return null;
+
+  const { intent, selection, planPreview } = agentResult;
+  const { dataset, plan, summary } = planPreview;
+
+  // Build agent log from real steps
+  const logLines = [
+    { tag: "OK", text: `Parsed intent: "${intent.task_type}" task, ${intent.modality} modality` },
+    { tag: "OK", text: `Queried curated dataset registry: ${selection.dataset_name}` },
+    { tag: "OK", text: `Selected model: ${plan.model_type} (${plan.framework})` },
+    { tag: ">", text: "Plan finalized — awaiting your confirmation..." },
+  ];
 
   return (
     <AppShell title="Prototype Plan">
@@ -88,8 +164,8 @@ export function Plan() {
                 </h4>
                 <div className="flex items-center gap-2">
                   <Icon name="category" size={18} className="text-secondary" />
-                  <span className="font-body-md text-text-primary">
-                    Classification
+                  <span className="font-body-md text-text-primary capitalize">
+                    {intent.task_type}
                   </span>
                 </div>
               </div>
@@ -99,8 +175,8 @@ export function Plan() {
                 </h4>
                 <div className="flex items-center gap-2">
                   <Icon name="table_rows" size={18} className="text-secondary" />
-                  <span className="font-body-md text-text-primary">
-                    Tabular healthcare data
+                  <span className="font-body-md text-text-primary capitalize">
+                    {intent.modality} healthcare data
                   </span>
                 </div>
               </div>
@@ -113,12 +189,12 @@ export function Plan() {
                   Selected dataset
                 </h4>
                 <p className="mb-3 font-body-md text-text-primary">
-                  Curated, de-identified dataset from the approved registry.
+                  {dataset.name}
                 </p>
               </div>
               <div className="flex items-center justify-between rounded border border-surface-tint bg-log-bg p-3">
                 <code className="font-code-sm text-code-sm text-log-text">
-                  mimic-iv-readmission@a1b2c3d
+                  {dataset.hfId}@{dataset.revision.substring(0, 7)}
                 </code>
                 <Icon
                   name="content_copy"
@@ -128,25 +204,25 @@ export function Plan() {
               </div>
             </div>
 
-            {/* Model + metric + rationale — framework kept as a secondary tag, not headline */}
+            {/* Model + metric + rationale */}
             <div className="col-span-1 grid grid-cols-1 gap-6 rounded border border-border bg-background p-4 md:col-span-2 md:grid-cols-3">
               <div className="border-border pr-4 md:border-r">
                 <h4 className="mb-2 font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Model family
                 </h4>
                 <p className="mb-2 font-headline-md text-headline-md text-primary">
-                  Gradient-boosted decision trees
+                  {plan.model_type === "xgboost" ? "Gradient-boosted decision trees" : plan.model_type}
                 </p>
                 <span className="inline-block rounded border border-border-strong bg-surface-muted px-2 py-0.5 font-code-sm text-code-sm text-text-secondary">
-                  XGBoost · v2.0.3
+                  {plan.framework} · {plan.device}
                 </span>
               </div>
               <div className="border-border pr-4 md:border-r">
                 <h4 className="mb-2 font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Target metric
                 </h4>
-                <p className="font-headline-md text-headline-md text-primary">
-                  Accuracy
+                <p className="font-headline-md text-headline-md text-primary capitalize">
+                  {plan.primary_metric}
                 </p>
                 <p className="mt-1 font-label-sm text-text-muted">
                   Compared against a majority-class baseline.
@@ -157,15 +233,13 @@ export function Plan() {
                   Why this approach
                 </h4>
                 <p className="font-body-md text-sm leading-relaxed text-text-primary">
-                  Decision-tree ensembles handle missing values common in
-                  clinical records, capture non-linear interactions in
-                  structured data, and expose feature importance for review.
+                  {summary}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Approved-data confirmation (spec guardrail) */}
+          {/* Approved-data confirmation */}
           <div className="border-t border-border bg-warning-bg/40 px-6 py-4">
             <label className="flex cursor-pointer items-start gap-3">
               <input
@@ -191,12 +265,21 @@ export function Plan() {
               Edit parameters
             </button>
             <button
-              disabled={!confirmed}
-              onClick={() => navigate("training", { goal })}
+              disabled={!confirmed || starting}
+              onClick={startTraining}
               className="flex items-center gap-2 rounded bg-primary px-6 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-all hover:bg-inverse-surface active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Icon name="play_arrow" size={18} />
-              Start Prototype
+              {starting ? (
+                <>
+                  <Icon name="hourglass_empty" size={18} className="animate-pulse" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <Icon name="play_arrow" size={18} />
+                  Start Prototype
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -208,7 +291,7 @@ export function Plan() {
             <span>Agent execution log</span>
           </div>
           <div className="space-y-1">
-            {LOG_LINES.map((line, i) => (
+            {logLines.map((line, i) => (
               <p key={i}>
                 <span
                   className={
