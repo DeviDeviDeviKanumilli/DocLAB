@@ -804,9 +804,14 @@ fn worker_python() -> String {
     if let Ok(py) = std::env::var("DOCLAB_PYTHON") {
         return py;
     }
-    let venv = worker_dir().join(".venv/bin/python");
-    if venv.exists() {
-        return venv.to_string_lossy().into_owned();
+    // Prefer a project venv. Windows uses `.venv/Scripts/python.exe`,
+    // Unix uses `.venv/bin/python` — check both so the worker is found
+    // on every platform.
+    for rel in [".venv/Scripts/python.exe", ".venv/bin/python"] {
+        let venv = worker_dir().join(rel);
+        if venv.exists() {
+            return venv.to_string_lossy().into_owned();
+        }
     }
     "python3".to_string()
 }
