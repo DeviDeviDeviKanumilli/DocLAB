@@ -90,7 +90,7 @@ export function Settings() {
             <div className="space-y-2">
               <Label>Preferred datasets</Label>
               <div className="flex flex-wrap gap-2">
-                {["MIMIC-IV", "Diabetes 130-US"].map((t) => (
+                {["Diabetes 130-US", "PadChest (public)"].map((t) => (
                   <span
                     key={t}
                     className="inline-flex items-center rounded-full border border-border bg-surface-muted px-3 py-1 font-label-sm text-label-sm text-text-secondary"

@@ -13,32 +13,35 @@ export interface ExperimentRow {
   status: "Complete" | "Running" | "Failed";
   date: string;
   isBest?: boolean;
+  /** Marks the run started in this app session — highlighted in the table. */
+  isCurrent?: boolean;
 }
 
 export const EXPERIMENTS: ExperimentRow[] = [
   {
     id: "EXP-0042",
     goal: "Predict readmission risk",
-    dataset: "MIMIC-IV Clinical",
+    dataset: "Diabetes 130-US (public)",
     model: "Decision-tree model",
     metric: "83% Accuracy",
     status: "Complete",
     date: "Today",
     isBest: true,
+    isCurrent: true,
   },
   {
     id: "EXP-0041",
-    goal: "Sepsis onset detection",
-    dataset: "ICU Vital Signs",
-    model: "Sequence model",
-    metric: "0.78 AUC",
+    goal: "Classify chest X-rays",
+    dataset: "PadChest (public)",
+    model: "Image recognizer",
+    metric: "0.88 AUC",
     status: "Running",
     date: "Today",
   },
   {
     id: "EXP-0040",
     goal: "Patient length of stay",
-    dataset: "Historical Admissions",
+    dataset: "Diabetes 130-US (public)",
     model: "Random forest",
     metric: "—",
     status: "Failed",
@@ -55,10 +58,10 @@ export const EXPERIMENTS: ExperimentRow[] = [
   },
   {
     id: "EXP-0038",
-    goal: "Medication dosage optimization",
-    dataset: "EHR Pharma (synthetic)",
-    model: "Decision-tree model",
-    metric: "1.2 RMSE",
+    goal: "Summarize medical education text",
+    dataset: "Medical Education Summaries",
+    model: "Text summarizer",
+    metric: "0.42 ROUGE-L",
     status: "Complete",
     date: "May 24, 2026",
   },

@@ -30,10 +30,10 @@ const EXAMPLES: Example[] = [
     goal: "Summarize medical education text into concise notes",
   },
   {
-    icon: "monitor_heart",
-    title: "Detect patterns in vital signs",
-    blurb: "Time-series analysis for early deterioration signals.",
-    goal: "Detect early-warning patterns in ICU vital-sign data",
+    icon: "table_chart",
+    title: "Classify clinical tabular records",
+    blurb: "Predict an outcome label from structured encounter data.",
+    goal: "Classify diabetic patient encounters by readmission outcome",
   },
 ];
 

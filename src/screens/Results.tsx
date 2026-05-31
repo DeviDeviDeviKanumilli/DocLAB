@@ -147,11 +147,11 @@ export function Results() {
                   Dataset summary
                 </h4>
                 <p className="mb-2 text-text-primary">
-                  MIMIC-IV readmission subset (curated, de-identified).
+                  Diabetes 130-US readmission set (public, de-identified).
                 </p>
                 <ul className="space-y-1 border-l-2 border-border-strong pl-3 font-label-sm text-label-sm text-text-muted">
-                  <li>Records: 45,210</li>
-                  <li>Features: 128 (demographics, vitals, labs)</li>
+                  <li>Records: 101,766</li>
+                  <li>Features: 150 (encounters, diagnoses, medications)</li>
                   <li>Split: 80% train / 10% val / 10% test</li>
                 </ul>
               </div>

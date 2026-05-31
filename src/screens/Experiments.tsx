@@ -44,11 +44,23 @@ export function Experiments() {
                   <tr
                     key={exp.id}
                     onClick={() => navigate("results", { goal: exp.goal })}
-                    className="group cursor-pointer transition-colors hover:bg-surface-muted"
+                    className={`group cursor-pointer transition-colors hover:bg-surface-muted ${
+                      exp.isCurrent
+                        ? "bg-primary/5 ring-1 ring-inset ring-primary/30"
+                        : ""
+                    }`}
                   >
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className="rounded bg-surface-container px-2 py-1 font-code-sm text-code-sm text-text-secondary">
-                        {exp.id}
+                      <span className="inline-flex items-center gap-2">
+                        {exp.isCurrent && (
+                          <span
+                            title="This session"
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                          />
+                        )}
+                        <span className="rounded bg-surface-container px-2 py-1 font-code-sm text-code-sm text-text-secondary">
+                          {exp.id}
+                        </span>
                       </span>
                     </td>
                     <td className="max-w-[200px] truncate px-4 py-3" title={exp.goal}>
