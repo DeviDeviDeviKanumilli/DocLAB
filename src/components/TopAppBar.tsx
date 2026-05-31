@@ -20,7 +20,7 @@ export function TopAppBar({
             <input
               type="text"
               placeholder="Search resources..."
-              className="w-64 rounded border border-border bg-background py-1.5 pl-10 pr-4 font-body-md text-body-md placeholder:text-text-disabled focus:border-outline focus:outline-none transition-colors"
+              className="w-64 rounded border border-border bg-background py-1.5 pl-10 pr-4 font-body-md text-body-md placeholder:text-text-disabled focus:border-accent focus:ring-1 focus:ring-accent/40 focus:outline-none transition-colors"
             />
           </div>
         ) : (
@@ -31,17 +31,17 @@ export function TopAppBar({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 rounded border border-border bg-background px-4 py-1.5 font-headline-md text-headline-md text-text-primary">
-          <Icon name="encrypted" size={18} />
-          Local only
-        </div>
+        <button className="flex items-center gap-2 rounded border border-border bg-background px-4 py-1.5 font-headline-md text-headline-md text-text-primary transition-colors hover:bg-surface-muted">
+          <Icon name="rocket_launch" size={18} />
+          Deploy Model
+        </button>
         <div className="mx-1 h-6 w-px bg-border" />
-        <div className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary">
-          <Icon name="notifications_off" size={20} />
-        </div>
-        <div className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary">
+        <button className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-accent/10 hover:text-accent">
+          <Icon name="notifications" size={20} />
+        </button>
+        <button className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-accent/10 hover:text-accent">
           <Icon name="account_circle" size={20} />
-        </div>
+        </button>
       </div>
     </header>
   );

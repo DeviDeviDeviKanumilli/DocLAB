@@ -77,7 +77,7 @@ export function Plan() {
       <AppShell title="Planning...">
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
-            <Icon name="model_training" size={48} className="mx-auto mb-4 animate-pulse text-primary" />
+            <Icon name="model_training" size={48} className="mx-auto mb-4 animate-pulse text-accent" />
             <p className="font-headline-md text-headline-md text-text-primary">
               Agent analyzing goal...
             </p>
@@ -136,7 +136,7 @@ export function Plan() {
                   s.state === "done"
                     ? "text-success-text"
                     : s.state === "active"
-                      ? "font-semibold text-primary"
+                      ? "font-semibold text-accent"
                       : ""
                 }`}
               >
@@ -158,7 +158,7 @@ export function Plan() {
         <div className="overflow-hidden rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border bg-surface-muted px-6 py-4">
             <div className="flex items-center gap-3">
-              <Icon name="memory" className="text-primary" />
+              <Icon name="memory" className="text-accent" />
               <h3 className="font-headline-md text-headline-md text-primary">
                 Planning agent — compiled prototype
               </h3>
@@ -272,7 +272,7 @@ export function Plan() {
                 type="checkbox"
                 checked={confirmed}
                 onChange={(e) => setConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-border-strong text-primary focus:ring-primary"
+                className="mt-0.5 h-4 w-4 rounded border-border-strong text-accent accent-accent focus:ring-accent"
               />
               <span className="font-body-md text-sm text-text-secondary">
                 I confirm this prototype uses{" "}
@@ -296,7 +296,7 @@ export function Plan() {
             <button
               disabled={!confirmed || starting}
               onClick={startTraining}
-              className="flex items-center gap-2 rounded bg-primary px-6 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-all hover:bg-inverse-surface active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-2 rounded bg-accent px-6 py-2 font-headline-md text-headline-md text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               {starting ? (
                 <>

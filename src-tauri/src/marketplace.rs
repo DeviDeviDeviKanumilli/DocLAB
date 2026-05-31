@@ -3,7 +3,13 @@ use std::path::Path;
 
 /// A curated dataset entry. The agent (M5) may only ever return ids that
 /// exist here — there is no live Hugging Face search at runtime.
+///
+/// Read from `datasets.yaml` (snake_case) but serialized to the frontend in
+/// camelCase, matching the convention used by the structs in `experiments.rs`
+/// and the `Dataset` interface in `src/types/tauri.ts`. Without the camelCase
+/// serialize, the UI sees `data_type`/`task_types` as `undefined` and crashes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct Dataset {
     pub id: String,
     pub name: String,
@@ -201,5 +207,20 @@ datasets:
         );
         let err = parse(&bad).expect_err("unpinned revision must fail");
         assert!(err.contains("main"), "got: {err}");
+    }
+
+    /// Regression: the frontend (`src/types/tauri.ts`) and the in-app agent
+    /// read camelCase keys; if `Dataset` serializes snake_case the Datasets
+    /// tab and Plan flow crash on `dataset.dataType`/`taskTypes` being
+    /// undefined. YAML must still deserialize from snake_case.
+    #[test]
+    fn serializes_camel_case_for_frontend() {
+        let m = parse(VALID).unwrap();
+        let json = serde_json::to_string(&m.datasets[0]).unwrap();
+        assert!(json.contains("\"dataType\""), "expected camelCase: {json}");
+        assert!(json.contains("\"taskTypes\""), "expected camelCase: {json}");
+        assert!(json.contains("\"hfId\""), "expected camelCase: {json}");
+        assert!(json.contains("\"labelColumn\""), "expected camelCase: {json}");
+        assert!(!json.contains("\"data_type\""), "snake_case leaked: {json}");
     }
 }
