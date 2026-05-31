@@ -3,13 +3,16 @@
 _Build roadmap for the hackathon MVP. Source of truth for scope: [spec.md](./spec.md). Demo flow: [DEMO.md](./DEMO.md)._
 
 This document breaks the build into ordered milestones. Each milestone is **independently
-demo-able or testable** and has explicit **exit criteria** — do not advance until they're met.
-When in doubt, deepen Phase 1 (M0–M7) rather than starting image/text.
+testable**, but **only M5+ is demo-able to judges** — M0–M4 are horizontal plumbing with no
+standalone story. Each has explicit **exit criteria**; do not advance until they're met.
+When in doubt, deepen Phase 1 (M0–M8) rather than starting image/text.
 
 ## Legend
 
 - **Status:** ☐ not started · ◐ in progress · ☑ done
 - **P0** = must-have for judging · **P1** = should-have · **P2** = nice-to-have
+- **🔒 = judge-pass minimum** (the hard gate below); everything else is polish that improves the
+  story but is the first thing cut under time pressure.
 - "Contract" = a fixed artifact/schema other layers depend on; do not change unilaterally.
 
 ## Dependency graph (high level)
@@ -24,6 +27,27 @@ M0 scaffold ─┬─> M1 marketplace ─┐
 ```
 
 M1, M2, M4 can be built in parallel once M0 lands. M5 is the integration gate for Phase 1.
+
+---
+
+## 🔒 Judge-pass minimum (the real hard gate)
+
+DEMO.md needs **one clean loop + one readable card + a working fallback** — nothing more. Treat
+this short list as the only true must-have. Everything else (full card template polish, best-run
+logic, broad hardening, stretch phases) is *polish-grade* and is the first thing cut under time.
+
+Judge-pass = **M0 + M1 + M2 + M3 + M4 + M5 + minimal model card (M6 subset) + one history row
+(M7 subset) + Fallback A (M8 subset)**. If you have only this, you can still demo and pass.
+
+**Timebox kill-switches (set absolute clock times on day 1):**
+- If **M5 (E2E gate) is not green by T-36h**, freeze scope: finish judge-pass minimum only, drop
+  all polish backlog.
+- If **M8 is not complete by T-24h**, **lock out M9/M10** (no image/text) and spend remaining
+  time on rehearsal + fallbacks (M11).
+- If a stretch path (M9 or M10) is not demo-able by **T-6h**, cut it from the live script and keep
+  it as "coming soon" UI only.
+
+> Fill in real clock times once the hackathon end time is known, e.g. "T-24h = Sat 10:00".
 
 ---
 
@@ -42,6 +66,9 @@ Stand up the three runtimes so later milestones have somewhere to land.
 - [ ] Rust side (`src-tauri/`) compiles and can shell out to a dummy `python -m doclab_worker`.
 - [ ] `marketplace/datasets.yaml` exists (can be empty list).
 - [ ] Decide + document data root: `~/.doclab/` vs `./doclab/` (spec open decision → recommend `~/.doclab/`).
+- [ ] **Seed fallback bundle** — drop a hand-written `experiments/_demo_seed/` with sample
+      `plan.json` / `metrics.json` / `model_card.md` (per DEMO.md Fallback B). De-risks integration
+      early and gives M11 something to point at from day one. Refine as real artifacts firm up.
 - [ ] Root `.gitignore` covers `node_modules/`, `.venv/`, `target/`, `dist/`, `doclab/`, `*.db`.
 
 **Exit:** `npm run tauri dev` opens a window; `python -m doclab_worker --help` runs; Rust build green.
@@ -70,9 +97,14 @@ The Python engine. JSON in (`plan.json`) → JSON out (`metrics.json`). **Contra
 - [ ] Split 80/10/10 with **fixed seed** (record seed in metrics).
 - [ ] Train XGBoost classifier; fallback to sklearn LogisticRegression if XGBoost errors.
 - [ ] Compute test **accuracy** + **majority-class baseline accuracy**.
-- [ ] Emit `metrics.json` — **contract**: `primary_metric, metric_value, baseline_metric,
-      device:"cpu", seed, split, n_train/n_val/n_test, model_type, framework`.
+- [ ] Emit `metrics.json` — **contract**: `schema_version:1, primary_metric, metric_value,
+      baseline_metric, device:"cpu", seed, split, n_train/n_val/n_test, model_type, framework`.
 - [ ] Worker exits non-zero with a JSON error blob on failure (Rust needs to detect this).
+      **Error contract** (write to `error.json` beside the plan + echo to stderr):
+      `{ "schema_version": 1, "code": "<machine_slug>", "message": "<human text>",
+      "stage": "load|preprocess|train|eval|write", "device_fallback": false }`.
+      `code` values are a closed set: `dataset_missing`, `bad_plan`, `train_failed`,
+      `oom`, `unknown`.
 - [ ] Test on a tiny fixture CSV: deterministic accuracy across two runs (seed works).
 
 **Exit:** run worker by hand on a sample plan → valid `metrics.json` with accuracy + baseline.
@@ -82,10 +114,11 @@ The Python engine. JSON in (`plan.json`) → JSON out (`metrics.json`). **Contra
 The Rust shell owns jobs, file paths, and the experiment database.
 
 - [ ] Create data root + subdirs on first run: `doclab.db`, `datasets/`, `experiments/`.
-- [ ] SQLite schema (migrations) — **contract**: `experiments` table with
-      `id, created_at, goal_text, dataset_id, model_type, framework, primary_metric,
-      metric_value, baseline_metric, dataset_size_warning, device, checkpoint_path, is_best,
-      plan_path, model_card_path`.
+- [ ] SQLite schema (migrations). Start with a **minimal P0 schema** — only what M5–M7 read/write:
+      `id, created_at, goal_text, dataset_id, primary_metric, metric_value, baseline_metric,
+      model_card_path, plan_path`. **Defer** these until needed: `model_type, framework,
+      dataset_size_warning, device, checkpoint_path, is_best` (add in M7/M9 via migration).
+      A narrow first schema means fewer migration/debug surprises before the first E2E run.
 - [ ] Job runner: write `plan.json` to `experiments/<id>/`, spawn worker, capture stdout/stderr.
 - [ ] Detect worker success (exit 0 + valid `metrics.json`) vs failure (non-zero + error blob).
 - [ ] Read `metrics.json` back, insert an `experiments` row.
@@ -99,8 +132,10 @@ The Rust shell owns jobs, file paths, and the experiment database.
 The five minimal screens from the spec. Clinical-intent copy only — never "XGBoost"/"LoRA" in primary flow.
 
 - [ ] **Home** — goal textarea + example chips ("Predict readmission risk", "Classify medical images…").
-- [ ] **Plan review** — dataset card, task, model, metric, the *"approved public data only"* warning,
-      a confirm checkbox, and **Start prototype** button.
+- [ ] **Plan review** — dataset card, task, **model family shown only as a secondary detail**
+      (lay wording in the primary line, e.g. "a decision-tree model" / "an image recognizer";
+      keep "XGBoost"/"CNN"/"LoRA" out of headline copy — see invariants), the
+      *"approved public data only"* warning, a confirm checkbox, and **Start prototype** button.
 - [ ] **Training** — progress steps (Loading data → Training → Evaluating) + optional log tail.
 - [ ] **Results** — big metric, one-line sanity message, **Open model card**, **View experiment**.
 - [ ] **History** — table of past runs (goal, dataset, metric, date); current session highlighted.
@@ -109,7 +144,7 @@ The five minimal screens from the spec. Clinical-intent copy only — never "XGB
 
 **Exit:** click through all five screens with mock data; copy uses intent language; disclaimer visible.
 
-## M5 — End-to-end tabular loop ☑ INTEGRATION GATE ☐ (P0) — depends on M1, M2, M3, M4
+## M5 — End-to-end tabular loop ☐ (P0, 🔒 INTEGRATION GATE) — depends on M1, M2, M3, M4
 
 Wire the agent together so a typed goal produces a real trained model. **This is the Phase 1 gate.**
 
@@ -117,8 +152,9 @@ Wire the agent together so a typed goal produces a real trained model. **This is
       optional LLM call only for parsing (see spec Option A/B). Dataset choice **constrained to curated ids**.
 - [ ] **Agent select + profile dataset** → `dataset_selection.json` + `data_profile.json`
       (schema, label column, row count, missing %).
-- [ ] **Agent emit plan** → `plan.json` (**contract**: model, preprocessing, split, seed, metric,
-      device, + human-readable summary) and render it on Plan review.
+- [ ] **Agent emit plan** → `plan.json` (**contract**: `schema_version:1`, model, preprocessing,
+      split, seed, metric, device, + human-readable summary) and render it on Plan review.
+      Rust must reject a plan whose `schema_version` it doesn't recognize (fail loud, not silent).
 - [ ] On approve → real worker run (M2) → real metrics → real SQLite row (M3) → Results screen.
 - [ ] Replace all mock data in M4 with live Tauri calls.
 - [ ] Error path: worker failure shows a friendly message, not a crash; experiment marked failed.
@@ -130,7 +166,11 @@ accuracy + majority-class baseline on Results, end-to-end on a laptop in **< 5 m
 
 Auto-generate the doctor-facing markdown card from the run. Uses the spec template verbatim.
 
-- [ ] Render `model_card.md` from template: Goal, Intended use, Summary (dataset/task/model/result),
+> **🔒 Judge-pass subset:** a readable card with result + baseline + the non-clinical disclaimer
+> is enough to pass. The full template (all limitation/reproducibility sections) is polish.
+
+- [ ] **(🔒 minimum)** Render result + baseline + non-clinical disclaimer into `model_card.md`.
+- [ ] (polish) Full template per spec: Goal, Intended use, Summary (dataset/task/model/result),
       Limitations, Risks, Reproducibility (`hf_id@revision`, seed, split, hyperparams).
 - [ ] Inject **sanity check** into the card: if `metric_value ≈ baseline_metric`, add
       *"Model may not be learning signal."*
@@ -144,7 +184,10 @@ Auto-generate the doctor-facing markdown card from the run. Uses the spec templa
 
 The iteration story for judging.
 
-- [ ] History screen lists runs from SQLite (goal, dataset, metric, date), newest first.
+> **🔒 Judge-pass subset:** one history row that reopens its saved results is enough. Best-run
+> badging and cross-session persistence are polish.
+
+- [ ] **(🔒 minimum)** History screen lists runs from SQLite (goal, dataset, metric, date), newest first.
 - [ ] Click a row → reopen its Results + model card (read from stored paths).
 - [ ] Within one goal session ("project"), mark highest `primary_metric` as `is_best = true`; show a badge.
 - [ ] History survives app restart (reads persisted DB, not session memory).
@@ -159,11 +202,13 @@ Make the golden path bulletproof for a live demo. Maps to spec "Success criteria
 - [ ] Cap/seed everything so the run is deterministic and finishes in < 5 min on the demo laptop.
 - [ ] Friendly errors on every failure surface (no raw stack traces in UI).
 - [ ] Verify all disclaimers present: Home warning, plan checkbox, model card risks.
-- [ ] Fallback assets ready (per DEMO.md): a pre-completed run visible in history; exported `plan.json`/
-      `metrics.json`/`model_card.md` bundle; screenshots/GIF of the loop.
-- [ ] Rehearse the P0 path twice end-to-end; record actual accuracy + timing.
+- [ ] Promote the M0 seed bundle into a real Fallback A: one pre-completed run visible in history.
 
-**Exit:** Phase 1 success criteria all checked; golden path rehearsed twice without intervention.
+> Rehearsal, MPS warmup, and the full fallback set (B/C) are **not** repeated here — they live in
+> M11, which references the single demo checklist in [DEMO.md](./DEMO.md). M8 just ensures the app
+> is *capable* of a clean run; M11 owns the dress rehearsal.
+
+**Exit:** Phase 1 success criteria all checked; app produces a clean deterministic run on the demo laptop.
 
 ---
 
