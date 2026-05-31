@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import { AppShell } from "../components/AppShell";
@@ -6,7 +7,29 @@ import { Icon } from "../components/Icon";
 import { Badge } from "../components/Badge";
 import { useRouter } from "../router";
 import { friendlyError } from "../lib/errors";
+import { useCountUp } from "../hooks/useCountUp";
 import type { ExperimentDetail } from "../types/tauri";
+
+/** Animated metric value: counts up from 0 on mount. */
+function CountValue({
+  target,
+  decimals = 0,
+  suffix = "",
+  delay = 0,
+}: {
+  target: number;
+  decimals?: number;
+  suffix?: string;
+  delay?: number;
+}) {
+  const v = useCountUp(target, { decimals, delay });
+  return (
+    <span>
+      {v}
+      {suffix}
+    </span>
+  );
+}
 
 export function Results() {
   const { params, navigate } = useRouter();
@@ -104,8 +127,8 @@ export function Results() {
         {detail.status === "complete" && (
           <>
             {/* Summary strip */}
-            <div className="mb-6 flex flex-wrap gap-x-12 gap-y-4 border-b border-border pb-6">
-              <div className="flex flex-col gap-0.5">
+            <div className="stagger mb-6 flex flex-wrap gap-x-12 gap-y-4 border-b border-border pb-6">
+              <div className="flex flex-col gap-0.5" style={{ "--i": 1 } as CSSProperties}>
                 <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Model family
                 </div>
@@ -113,25 +136,30 @@ export function Results() {
                   {detail.modelType === "xgboost" ? "Gradient-boosted trees" : detail.modelType || "Unknown"}
                 </div>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5" style={{ "--i": 2 } as CSSProperties}>
                 <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Accuracy
                 </div>
                 <div className="flex items-baseline gap-2 text-headline-md text-text-primary font-headline-md">
-                  {metricPercent}%
+                  <CountValue target={Number(metricPercent)} decimals={1} suffix="%" delay={250} />
                   <span className="font-label-sm text-success-text">{deltaStr} vs baseline</span>
                 </div>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5" style={{ "--i": 3 } as CSSProperties}>
                 <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Status
                 </div>
                 <div className="flex items-baseline gap-2 text-headline-md text-text-primary font-headline-md">
                   Saved
-                  <Icon name="check_circle" size={18} className="text-success-text" />
+                  <Icon
+                    name="check_circle"
+                    size={18}
+                    className="pop text-success-text"
+                    style={{ animationDelay: "0.5s" } as CSSProperties}
+                  />
                 </div>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-0.5" style={{ "--i": 4 } as CSSProperties}>
                 <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Experiment ID
                 </div>

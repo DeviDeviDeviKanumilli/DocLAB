@@ -86,12 +86,12 @@ export function Experiments() {
                     <th className="px-4 py-3 text-right font-normal">Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border font-body-md text-body-md text-text-primary">
+                <tbody className="stagger divide-y divide-border font-body-md text-body-md text-text-primary">
                   {experiments.map((exp) => (
                     <tr
                       key={exp.id}
                       onClick={() => navigate("results", { experimentId: exp.id })}
-                      className="group cursor-pointer transition-colors hover:bg-surface-muted"
+                      className="group cursor-pointer transition-colors hover:bg-surface-muted hover:shadow-[inset_3px_0_0_0_var(--color-primary)]"
                     >
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className="rounded bg-surface-container px-2 py-1 font-code-sm text-code-sm text-text-secondary">
