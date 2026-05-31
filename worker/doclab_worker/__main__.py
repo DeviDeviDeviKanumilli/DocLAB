@@ -37,8 +37,19 @@ def data_root() -> Path:
 
 
 def run_job(plan_path: Path) -> dict:
-    """Chain the tabular pipeline. Raises WorkerError on any failure."""
+    """Dispatch to the right training engine based on the plan's modality.
+
+    Tabular is the default; image plans route to the PyTorch CNN path. Both
+    return a metrics dict; image runs may add `device_fallback` and `warning`.
+    """
     plan = tabular.load_plan(plan_path)
+    modality = (plan.get("modality") or plan.get("data_type") or "tabular").lower()
+
+    if modality == "image":
+        from . import image
+
+        return image.run_job(plan, data_root())
+
     df = tabular.load_data(plan, data_root())
     X, y = tabular.preprocess(df, plan.get("label_column", ""))
     splits = tabular.split(X, y, plan["split"], plan["seed"])

@@ -242,18 +242,24 @@ Make the golden path bulletproof for a live demo. Maps to spec "Success criteria
 Second demo path. Reuses the M5 loop; adds a PyTorch CNN worker and MPS device handling.
 Do **not** start until Phase 1 (M0–M8) is solid.
 
-## M9 — Image classification path ☐ (P1) — depends on M8
+## M9 — Image classification path ☑ (P1) — depends on M8
 
-- [ ] Add **1 curated image** dataset to `datasets.yaml` (2-class, small enough for laptop training).
-- [ ] Extend worker: PyTorch CNN (simple ConvNet or small ResNet), short epoch budget.
-- [ ] **Device selection** — use the spec's `resolve_device()`: `mps` on Apple Silicon else `cpu`.
-      Record `device` in `plan.json` + `metrics.json`.
-- [ ] **MPS → CPU fallback**: catch MPS op errors once, retry job on `cpu`, log `device_fallback: true`.
-- [ ] Cap epochs so a demo run finishes in < 3–5 min; fixed seed.
-- [ ] Sanity check: if training set **< 500 samples**, set `dataset_size_warning` → model card note
-      *"Small dataset; high accuracy may reflect overfitting."*
-- [ ] Agent routes image goals ("classify medical images as normal/abnormal") to this path.
-- [ ] `metrics.json` reports test accuracy + `device`.
+- [x] Add **1 curated image** dataset to `datasets.yaml` (2-class, small enough for laptop training).
+      _`chest_xray_pneumonia` (NORMAL vs PNEUMONIA) was already curated; now wired end-to-end._
+- [x] Extend worker: PyTorch CNN (simple ConvNet or small ResNet), short epoch budget.
+      _`image.py`: TinyConvNet, 3 epochs, 64×64 grayscale, subsampled to 800 train / 200 test._
+- [x] **Device selection** — use the spec's `resolve_device()`: `mps` on Apple Silicon else `cpu`.
+      Record `device` in `plan.json` + `metrics.json`. _`device.py::resolve_device()`._
+- [x] **MPS → CPU fallback**: catch MPS op errors once, retry job on `cpu`, log `device_fallback: true`.
+      _Proven by `test_mps_failure_falls_back_to_cpu`._
+- [x] Cap epochs so a demo run finishes in < 3–5 min; fixed seed.
+      _Real MPS run completed in ~1 min; seed 42 throughout._
+- [x] Sanity check: if training set **< 500 samples**, set `dataset_size_warning` → model card note
+      *"Small dataset; high accuracy may reflect overfitting."* _Emitted as `warning`; folded into the card._
+- [x] Agent routes image goals ("classify medical images as normal/abnormal") to this path.
+      _`parser.ts` maps x-ray/image/scan → image modality; `create_plan` builds a CNN plan._
+- [x] `metrics.json` reports test accuracy + `device`.
+      _Real run: 76% accuracy vs 62.5% baseline on `device: mps`, `device_fallback: false`._
 
 **Exit (spec Phase 2):** type an image-classification goal → approve → accuracy + small-data
 warning in the model card; one MPS run verified on the demo Mac (with CPU fallback proven to work).

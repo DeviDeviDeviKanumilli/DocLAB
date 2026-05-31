@@ -100,6 +100,10 @@ struct MetricsBlob {
     model_type: String,
     framework: String,
     device: String,
+    #[serde(default)]
+    device_fallback: bool,
+    #[serde(default)]
+    warning: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -121,26 +125,45 @@ pub fn create_plan(
         .find(|d| d.id == wanted_id)
         .ok_or_else(|| format!("dataset id '{wanted_id}' is not in the curated marketplace"))?;
 
-    if !dataset.data_type.eq_ignore_ascii_case("tabular") {
-        return Err(format!(
-            "dataset '{}' is {}, but M3 only supports tabular plans",
-            dataset.id, dataset.data_type
-        ));
-    }
+    let data_type = dataset.data_type.to_lowercase();
+    let (model_type, framework, summary): (&str, &str, String) = match data_type.as_str() {
+        "tabular" => (
+            "xgboost",
+            "xgboost",
+            format!(
+                "Train a decision-tree tabular prototype on {} and report accuracy against a majority-class baseline.",
+                dataset.name
+            ),
+        ),
+        "image" => (
+            "cnn",
+            "pytorch",
+            format!(
+                "Train a small convolutional network on {} (subsampled for time) and report accuracy against a majority-class baseline.",
+                dataset.name
+            ),
+        ),
+        other => {
+            return Err(format!(
+                "dataset '{}' is {}, which is not yet supported (tabular and image only)",
+                dataset.id, other
+            ));
+        }
+    };
 
-    let summary = format!(
-        "Train a decision-tree tabular prototype on {} and report accuracy against a majority-class baseline.",
-        dataset.name
-    );
+    // Image runs use the Mac GPU when available; the worker resolves the real
+    // device at runtime and may fall back to CPU. Tabular stays CPU.
+    let device = if data_type == "image" { "mps" } else { "cpu" };
+
     let plan = WorkerPlan {
         schema_version: SCHEMA_VERSION,
         dataset_id: dataset.id.clone(),
         hf_id: dataset.hf_id.clone(),
         revision: dataset.revision.clone(),
         label_column: dataset.label_column.clone(),
-        model_type: "xgboost".to_string(),
-        framework: "xgboost".to_string(),
-        device: "cpu".to_string(),
+        model_type: model_type.to_string(),
+        framework: framework.to_string(),
+        device: device.to_string(),
         seed: 42,
         split: vec![0.8, 0.1, 0.1],
         primary_metric: "accuracy".to_string(),
@@ -171,15 +194,18 @@ fn sanitize_model_name(goal: &str) -> String {
     }
 }
 
-fn infer_task_type(_plan: &WorkerPlan) -> &'static str {
-    // Phase 1: all tabular runs are binary classification.
-    "Binary classification"
+fn infer_task_type(plan: &WorkerPlan) -> &'static str {
+    match plan.model_type.as_str() {
+        "cnn" => "Image classification",
+        _ => "Binary classification",
+    }
 }
 
 fn model_display_name(model_type: &str) -> String {
     match model_type {
         "xgboost" => "Gradient-boosted decision trees (XGBoost)".to_string(),
         "logistic_regression" => "Logistic regression".to_string(),
+        "cnn" => "Small convolutional neural network (PyTorch)".to_string(),
         other => other.to_string(),
     }
 }
@@ -210,6 +236,19 @@ fn generate_model_card(
         format!("\n- {}", dataset.limitations.trim())
     };
 
+    // Worker-emitted notes: small-data warning (image) + MPS->CPU fallback.
+    let mut extra_notes = String::new();
+    if let Some(w) = &metrics.warning {
+        if !w.trim().is_empty() {
+            extra_notes.push_str(&format!("\n\n> **Note:** {}", w.trim()));
+        }
+    }
+    if metrics.device_fallback {
+        extra_notes.push_str(
+            "\n\n> **Note:** GPU (MPS) training failed and the run fell back to CPU.",
+        );
+    }
+
     let revision_short = &plan.revision[..7.min(plan.revision.len())];
     let split_display = format!(
         "{:.0}/{:.0}/{:.0}",
@@ -226,7 +265,7 @@ fn generate_model_card(
 - **Dataset:** {dataset_name} (public / de-identified)\n\
 - **Task:** {task}\n\
 - **Model:** {model_display}\n\
-- **Result:** {result_pct}% accuracy (baseline: {baseline_pct}%){sanity_note}\n\n\
+- **Result:** {result_pct}% accuracy (baseline: {baseline_pct}%){sanity_note}{extra_notes}\n\n\
 ## Limitations\n\
 - Trained on a public prototype dataset; may not generalize to real hospitals.{dataset_limitation}\n\n\
 ## Risks\n\
@@ -862,6 +901,8 @@ mod tests {
             model_type: "xgboost".to_string(),
             framework: "xgboost".to_string(),
             device: "cpu".to_string(),
+            device_fallback: false,
+            warning: None,
         };
 
         // Two runs for the same goal, one for a different goal.
