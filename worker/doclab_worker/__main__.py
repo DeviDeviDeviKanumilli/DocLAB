@@ -50,6 +50,11 @@ def run_job(plan_path: Path) -> dict:
 
         return image.run_job(plan, data_root())
 
+    if modality == "text":
+        from . import text
+
+        return text.run_job(plan, data_root())
+
     df = tabular.load_data(plan, data_root())
     X, y = tabular.preprocess(df, plan.get("label_column", ""))
     splits = tabular.split(X, y, plan["split"], plan["seed"])

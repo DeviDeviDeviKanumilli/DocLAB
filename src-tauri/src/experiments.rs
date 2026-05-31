@@ -104,6 +104,15 @@ struct MetricsBlob {
     device_fallback: bool,
     #[serde(default)]
     warning: Option<String>,
+    #[serde(default)]
+    examples: Vec<SummaryExample>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct SummaryExample {
+    input: String,
+    prediction: String,
+    reference: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -221,10 +230,22 @@ fn generate_model_card(
     let model_name = sanitize_model_name(goal_text);
     let task = infer_task_type(plan);
     let model_display = model_display_name(&metrics.model_type);
-    let result_pct = (metrics.metric_value * 100.0).round() as i64;
-    let baseline_pct = (metrics.baseline_metric * 100.0).round() as i64;
 
-    let sanity_note = if metrics.metric_value <= metrics.baseline_metric + 0.02 {
+    // Summarization reports ROUGE-L (a 0-1 similarity), not an accuracy vs a
+    // majority-class baseline, so the Result line is phrased per metric.
+    let is_similarity = metrics.primary_metric == "rouge_l";
+    let result_line = if is_similarity {
+        format!(
+            "- **Result:** ROUGE-L similarity {:.2} (0–1; higher means closer to the reference summaries)",
+            metrics.metric_value
+        )
+    } else {
+        let result_pct = (metrics.metric_value * 100.0).round() as i64;
+        let baseline_pct = (metrics.baseline_metric * 100.0).round() as i64;
+        format!("- **Result:** {result_pct}% accuracy (baseline: {baseline_pct}%)")
+    };
+
+    let sanity_note = if !is_similarity && metrics.metric_value <= metrics.baseline_metric + 0.02 {
         "\n\n> **Sanity check:** the result is at or near the majority-class baseline. The model may not be learning meaningful signal from this data."
     } else {
         ""
@@ -249,6 +270,23 @@ fn generate_model_card(
         );
     }
 
+    // Summarization: qualitative input->prediction->reference examples.
+    let examples_section = if metrics.examples.is_empty() {
+        String::new()
+    } else {
+        let mut s = String::from("\n## Examples\n\nQualitative only — not scored.\n");
+        for (i, ex) in metrics.examples.iter().enumerate() {
+            s.push_str(&format!(
+                "\n**Example {}**\n- *Input:* {}\n- *Model summary:* {}\n- *Reference:* {}\n",
+                i + 1,
+                ex.input.trim(),
+                ex.prediction.trim(),
+                ex.reference.trim(),
+            ));
+        }
+        s
+    };
+
     let revision_short = &plan.revision[..7.min(plan.revision.len())];
     let split_display = format!(
         "{:.0}/{:.0}/{:.0}",
@@ -265,13 +303,14 @@ fn generate_model_card(
 - **Dataset:** {dataset_name} (public / de-identified)\n\
 - **Task:** {task}\n\
 - **Model:** {model_display}\n\
-- **Result:** {result_pct}% accuracy (baseline: {baseline_pct}%){sanity_note}{extra_notes}\n\n\
+{result_line}{sanity_note}{extra_notes}\n\n\
 ## Limitations\n\
 - Trained on a public prototype dataset; may not generalize to real hospitals.{dataset_limitation}\n\n\
 ## Risks\n\
 - Not validated for patient care. Do not use for diagnosis or treatment decisions.\n\
 - False positives or false negatives could lead to inappropriate clinical actions.\n\
-- Performance may degrade on populations not represented in the training data.\n\n\
+- Performance may degrade on populations not represented in the training data.\n\
+{examples_section}\n\
 ## Reproducibility\n\
 - **Dataset:** `{hf_id}@{revision_short}`\n\
 - **Seed:** {seed}\n\
@@ -286,9 +325,10 @@ fn generate_model_card(
         dataset_name = dataset.name,
         task = task,
         model_display = model_display,
-        result_pct = result_pct,
-        baseline_pct = baseline_pct,
+        result_line = result_line,
         sanity_note = sanity_note,
+        extra_notes = extra_notes,
+        examples_section = examples_section,
         dataset_limitation = dataset_limitation,
         hf_id = plan.hf_id,
         revision_short = revision_short,
@@ -903,6 +943,7 @@ mod tests {
             device: "cpu".to_string(),
             device_fallback: false,
             warning: None,
+            examples: Vec::new(),
         };
 
         // Two runs for the same goal, one for a different goal.

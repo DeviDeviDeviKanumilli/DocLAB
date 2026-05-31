@@ -271,15 +271,22 @@ warning in the model card; one MPS run verified on the demo Mac (with CPU fallba
 Third path. Transformers + PEFT LoRA on a small model. Highest risk on MPS — rehearse early or
 fall back to CPU. Do **not** start until Phase 2 is demo-able.
 
-## M10 — Text summarization path ☐ (P2) — depends on M9
+## M10 — Text summarization path ☑ (P2) — depends on M9
 
-- [ ] Add **1 curated text** dataset with reference summaries (train/eval split, `summary` column).
-- [ ] Extend worker: `transformers` + PEFT **LoRA** on a small model (100M–350M class), **no Unsloth**.
-- [ ] LoRA rank 8–16, 1–3 epochs; cap steps so the demo finishes in < 3–5 min; fixed seed.
-- [ ] Device: `mps` if available else `cpu`; `use_mps_device`/`.to("mps")`; CPU fallback on op errors.
-- [ ] Metric: **ROUGE-L** (via `rouge-score` or `evaluate`); label it "similarity" in UI if clearer.
-- [ ] Model card: include **3 fixed example** input→summary pairs vs reference (qualitative only).
-- [ ] Agent routes summarization goals to this path.
+- [x] Add **1 curated text** dataset with reference summaries (train/eval split, `summary` column).
+      _`medical_text_summarization_synthetic` (Text→Summary, 1481 examples) wired end-to-end._
+- [x] Extend worker: `transformers` + PEFT **LoRA** on a small model (100M–350M class), **no Unsloth**.
+      _`text.py`: LoRA adapter on `t5-small` (q/v modules); plain transformers + peft, no Unsloth._
+- [x] LoRA rank 8–16, 1–3 epochs; cap steps so the demo finishes in < 3–5 min; fixed seed.
+      _rank 8, alpha 16, 1 epoch, subsampled to 200 train / 40 eval; seed 42; real run ~2 min on MPS._
+- [x] Device: `mps` if available else `cpu`; `.to("mps")`; CPU fallback on op errors.
+      _Shared `resolve_device()`; one-shot MPS→CPU fallback on both train and generate._
+- [x] Metric: **ROUGE-L** (via `rouge-score`); labeled "similarity" in the card.
+      _`_rouge_l()` fmeasure; card renders "ROUGE-L similarity 0.xx (0–1; higher = closer)"._
+- [x] Model card: include **3 fixed example** input→summary pairs vs reference (qualitative only).
+      _Worker emits `examples[]`; card renders an Examples section (input / model summary / reference)._
+- [x] Agent routes summarization goals to this path.
+      _`parser.ts` maps summarize/text/note/document → text modality; `create_plan` builds a LoRA plan._
 
 **Exit (spec Phase 3):** "summarize medical education text" runs on a small model →
 ROUGE-L + 3 examples in the card.

@@ -1,7 +1,7 @@
 # DocLab worker dependencies.
 # Tabular path (M2): pandas/scikit-learn/xgboost/datasets.
 # Image path (M9): torch + torchvision (MPS on Apple Silicon, CPU fallback).
-# Text path (transformers + peft) deps are added in M10.
+# Text path (M10): transformers + peft LoRA + rouge-score (ROUGE-L).
 pandas
 scikit-learn
 xgboost
@@ -10,3 +10,7 @@ pytest
 torch
 torchvision
 pyyaml
+transformers
+peft
+rouge-score
+accelerate
