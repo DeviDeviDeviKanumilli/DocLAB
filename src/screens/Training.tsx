@@ -100,7 +100,7 @@ export function Training() {
                     }`}
                   >
                     {state === "done" && (
-                      <Icon name="check" size={16} className="text-success-text" />
+                      <Icon name="check" size={16} className="pop text-success-text" />
                     )}
                     {state === "active" && (
                       <span className="h-3 w-3 animate-pulse rounded-full bg-primary" />

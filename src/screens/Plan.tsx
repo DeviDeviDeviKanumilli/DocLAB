@@ -69,7 +69,7 @@ export function Plan() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
+          <div className="stagger grid grid-cols-1 gap-4 p-6 md:grid-cols-2">
             {/* Objective */}
             <div className="col-span-1 rounded border border-border bg-background p-4 md:col-span-2">
               <h4 className="mb-2 font-label-sm text-label-sm uppercase tracking-wider text-text-muted">

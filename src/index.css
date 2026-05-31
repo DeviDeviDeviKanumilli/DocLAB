@@ -111,8 +111,14 @@
   --text-headline-lg--font-weight: 600;
 
   /* ---- Motion ---- */
-  --animate-fade-in-up: fade-in-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --animate-fade-in-up: fade-in-up 0.55s var(--ease-out-expo) forwards;
   --animate-fade-in: fade-in 0.4s ease-out forwards;
+  --animate-page-enter: page-enter 0.5s var(--ease-out-expo) both;
+  --animate-pop: pop 0.4s var(--ease-spring) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
 }
 
 @keyframes fade-in-up {
@@ -125,6 +131,26 @@
   to { opacity: 1; }
 }
 
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.994); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
 /* Base */
 html,
 body,
@@ -134,11 +160,31 @@ body,
 
 body {
   margin: 0;
-  background-color: var(--color-background);
   color: var(--color-text-primary);
   font-family: var(--font-body-md);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Subtle layered depth instead of a flat fill — barely-there warm light. */
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(1200px 600px at 78% -10%, rgba(0, 0, 0, 0.035), transparent 60%),
+    radial-gradient(900px 500px at 0% 8%, rgba(0, 0, 0, 0.02), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Smooth, consistent feel on interactive elements without per-element noise. */
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s var(--ease-out-expo),
+    opacity 0.2s ease;
 }
 
 ::selection {
@@ -165,11 +211,69 @@ body {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
-/* Staggered reveal helper: set --i on each child for an ordered cascade. */
+/* Whole-screen entrance, applied by AppShell on every route change. */
+.page-enter {
+  animation: var(--animate-page-enter);
+}
+
+/* Staggered reveal helper: children cascade in automatically by position.
+   Honors an inline --i if you set one; otherwise falls back to source order. */
 .stagger > * {
   opacity: 0;
-  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fade-in-up 0.5s var(--ease-out-expo) forwards;
   animation-delay: calc(var(--i, 0) * 60ms);
+}
+.stagger > *:nth-child(1) { animation-delay: calc(var(--i, 1) * 55ms); }
+.stagger > *:nth-child(2) { animation-delay: calc(var(--i, 2) * 55ms); }
+.stagger > *:nth-child(3) { animation-delay: calc(var(--i, 3) * 55ms); }
+.stagger > *:nth-child(4) { animation-delay: calc(var(--i, 4) * 55ms); }
+.stagger > *:nth-child(5) { animation-delay: calc(var(--i, 5) * 55ms); }
+.stagger > *:nth-child(6) { animation-delay: calc(var(--i, 6) * 55ms); }
+.stagger > *:nth-child(7) { animation-delay: calc(var(--i, 7) * 55ms); }
+.stagger > *:nth-child(8) { animation-delay: calc(var(--i, 8) * 55ms); }
+.stagger > *:nth-child(n + 9) { animation-delay: 495ms; }
+
+/* Ordered cascade you can attach to any element with an inline --i. */
+.reveal {
+  opacity: 0;
+  animation: fade-in-up 0.5s var(--ease-out-expo) forwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* Spring "pop" — used for completing checkmarks and badges. */
+.pop {
+  animation: var(--animate-pop);
+}
+
+/* SVG line that draws itself in. */
+.draw-line {
+  stroke-dasharray: var(--len, 400);
+  stroke-dashoffset: var(--len, 400);
+  animation: draw 1.1s var(--ease-out-expo) 0.15s forwards;
+}
+
+/* Loading shimmer surface. */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 25%,
+    var(--color-surface-container) 37%,
+    var(--color-surface-muted) 63%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Accessibility: respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Thin, unobtrusive scrollbars to match the clinical aesthetic */
