@@ -162,9 +162,11 @@ def _rouge_l(predictions, references) -> float:
     return float(sum(scores) / len(scores)) if scores else 0.0
 
 
-def run_job(plan: dict, data_root: Path) -> dict:
+def run_job(plan: dict, data_root: Path, job_dir: Path) -> dict:
     """LoRA summarization pipeline. Returns a metrics dict with ROUGE-L as the
     primary metric plus a few fixed input->prediction->reference examples."""
+    import json
+
     seed = plan.get("seed", 42)
     train_rows, eval_rows = load_text_data(plan, data_root)
 
@@ -208,6 +210,27 @@ def run_job(plan: dict, data_root: Path) -> dict:
         for i in range(min(N_EXAMPLES, len(eval_texts)))
     ]
 
+    # Save checkpoint
+    checkpoints_dir = job_dir / "checkpoints"
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save LoRA adapter and tokenizer
+    adapter_dir = checkpoints_dir / "adapter"
+    model.save_pretrained(adapter_dir)
+    tok.save_pretrained(adapter_dir)
+
+    # Save manifest
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "modality": "text",
+        "model_type": "lora_t5_small",
+        "framework": "transformers",
+        "text_column": plan.get("text_column", "Text"),
+        "label_column": plan.get("label_column", "Summary"),
+        "model_name": MODEL_NAME,
+    }
+    (checkpoints_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
     return {
         "schema_version": SCHEMA_VERSION,
         "primary_metric": "rouge_l",
@@ -223,4 +246,71 @@ def run_job(plan: dict, data_root: Path) -> dict:
         "model_type": "lora_t5_small",
         "framework": "transformers",
         "examples": examples,
+        "checkpoint_dir": "checkpoints",
     }
+
+
+def predict(checkpoints_dir: Path, input_text: str) -> dict:
+    """Load checkpoint and generate summary for input text."""
+    import json
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+    # Load manifest
+    manifest_path = checkpoints_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise WorkerError("checkpoint_missing", "load", "manifest.json not found")
+
+    manifest = json.loads(manifest_path.read_text())
+    model_name = manifest.get("model_name", MODEL_NAME)
+
+    # Load adapter
+    adapter_dir = checkpoints_dir / "adapter"
+    if not adapter_dir.exists():
+        raise WorkerError("checkpoint_missing", "load", "adapter directory not found")
+
+    try:
+        base_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        model = PeftModel.from_pretrained(base_model, adapter_dir)
+        tokenizer = AutoTokenizer.from_pretrained(adapter_dir)
+        model.eval()
+    except Exception as e:
+        raise WorkerError("checkpoint_missing", "load", f"cannot load model: {e}")
+
+    # Validate input
+    if not input_text or not input_text.strip():
+        raise WorkerError("bad_input", "predict", "input text is empty")
+
+    # Generate summary
+    try:
+        device = resolve_device()
+        model = model.to(device)
+
+        inputs = tokenizer(
+            PREFIX + input_text,
+            max_length=MAX_INPUT_TOKENS,
+            truncation=True,
+            return_tensors="pt",
+        ).to(device)
+
+        with torch.no_grad():
+            output_ids = model.generate(
+                **inputs,
+                max_new_tokens=MAX_TARGET_TOKENS,
+                num_beams=2,
+            )
+
+        summary = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "modality": "text",
+            "prediction": summary,
+            "confidence": None,
+            "detail": "Generated summary (not validated against reference).",
+            "warning": "Not for clinical use.",
+        }
+    except Exception as e:
+        raise WorkerError("predict_failed", "predict", f"generation failed: {e}")
+

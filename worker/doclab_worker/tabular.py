@@ -164,3 +164,128 @@ def build_metrics(plan, accuracy, baseline, splits, model_type, framework) -> di
     }
 
 
+def save_checkpoint(model, model_type, framework, label_column, feature_columns, job_dir: Path):
+    """Save model checkpoint and manifest for later inference."""
+    import joblib
+
+    checkpoints_dir = job_dir / "checkpoints"
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save model
+    joblib.dump(model, checkpoints_dir / "model.joblib")
+
+    # Save preprocessing metadata
+    preprocess_meta = {
+        "label_column": label_column,
+        "feature_columns": feature_columns,
+    }
+    (checkpoints_dir / "preprocess.json").write_text(json.dumps(preprocess_meta, indent=2))
+
+    # Save manifest
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "modality": "tabular",
+        "model_type": model_type,
+        "framework": framework,
+        "label_column": label_column,
+    }
+    (checkpoints_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
+    return "checkpoints"
+
+
+def predict(checkpoints_dir: Path, input_json: str) -> dict:
+    """Load checkpoint and run inference on tabular input."""
+    import joblib
+    import pandas as pd
+
+    # Load manifest
+    manifest_path = checkpoints_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise WorkerError("checkpoint_missing", "load", "manifest.json not found")
+
+    manifest = json.loads(manifest_path.read_text())
+    label_column = manifest.get("label_column", "")
+
+    # Load model
+    model_path = checkpoints_dir / "model.joblib"
+    if not model_path.exists():
+        raise WorkerError("checkpoint_missing", "load", "model.joblib not found")
+
+    try:
+        model = joblib.load(model_path)
+    except Exception as e:
+        raise WorkerError("checkpoint_missing", "load", f"cannot load model: {e}")
+
+    # Load preprocessing metadata
+    preprocess_path = checkpoints_dir / "preprocess.json"
+    if not preprocess_path.exists():
+        raise WorkerError("checkpoint_missing", "load", "preprocess.json not found")
+
+    preprocess_meta = json.loads(preprocess_path.read_text())
+    feature_columns = preprocess_meta.get("feature_columns", [])
+
+    # Parse input
+    try:
+        input_data = json.loads(input_json) if isinstance(input_json, str) else input_json
+    except json.JSONDecodeError as e:
+        raise WorkerError("bad_input", "predict", f"input is not valid JSON: {e}")
+
+    if not isinstance(input_data, dict):
+        raise WorkerError("bad_input", "predict", "input must be a JSON object")
+
+    # Convert to DataFrame and align with training features
+    try:
+        df = pd.DataFrame([input_data])
+
+        # Apply same preprocessing as training (one-hot encoding)
+        obj_cols = df.select_dtypes(include=["object"]).columns
+        if len(obj_cols) > 0:
+            df = pd.get_dummies(df, columns=list(obj_cols), dummy_na=False)
+
+        # Fill missing numeric values with 0 (median not available at predict time)
+        num_cols = df.select_dtypes(include=["number"]).columns
+        if len(num_cols) > 0:
+            df[num_cols] = df[num_cols].fillna(0)
+
+        # Align columns with training (add missing, remove extra)
+        for col_idx in feature_columns:
+            col_name = f"feature_{col_idx}"
+            if col_name not in df.columns:
+                df[col_name] = 0
+
+        # Convert to numpy array
+        X = df.to_numpy(dtype=float)
+
+        # Ensure correct number of features
+        if X.shape[1] != len(feature_columns):
+            # Pad or truncate to match training shape
+            if X.shape[1] < len(feature_columns):
+                padding = np.zeros((X.shape[0], len(feature_columns) - X.shape[1]))
+                X = np.hstack([X, padding])
+            else:
+                X = X[:, :len(feature_columns)]
+
+    except Exception as e:
+        raise WorkerError("bad_input", "predict", f"cannot process input: {e}")
+
+    # Run inference
+    try:
+        if hasattr(model, "predict_proba"):
+            probs = model.predict_proba(X)[0]
+            pred_idx = int(np.argmax(probs))
+            confidence = float(probs[pred_idx])
+        else:
+            pred_idx = int(model.predict(X)[0])
+            confidence = None
+
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "modality": "tabular",
+            "prediction": f"Class {pred_idx}",
+            "confidence": round(confidence, 4) if confidence is not None else None,
+            "detail": "Prototype prediction only.",
+            "warning": "Not for clinical use.",
+        }
+    except Exception as e:
+        raise WorkerError("predict_failed", "predict", f"inference failed: {e}")

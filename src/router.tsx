@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 /** Every screen in the M4 shell. Kept as a string union so navigation is typo-proof. */
 export type Route =
@@ -24,17 +31,22 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>("home");
   const [params, setParams] = useState<Record<string, unknown>>({});
 
-  function navigate(next: Route, nextParams: Record<string, unknown> = {}) {
+  const navigate = useCallback((next: Route, nextParams: Record<string, unknown> = {}) => {
     setParams(nextParams);
     setRoute(next);
     // Keep the scroll position sane when swapping full screens.
     requestAnimationFrame(() => {
       document.getElementById("doclab-main")?.scrollTo({ top: 0 });
     });
-  }
+  }, []);
+
+  const value = useMemo(
+    () => ({ route, params, navigate }),
+    [route, params, navigate],
+  );
 
   return (
-    <RouterContext.Provider value={{ route, params, navigate }}>
+    <RouterContext.Provider value={value}>
       {children}
     </RouterContext.Provider>
   );

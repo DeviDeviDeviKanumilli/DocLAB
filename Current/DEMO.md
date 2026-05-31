@@ -13,9 +13,21 @@ Full product context: [spec.md](./spec.md)
 
 ## Before you present (15 min checklist)
 
+**Run the automated preflight first** — it verifies most of the items below in one shot:
+
+```bash
+cd worker && .venv/bin/python scripts/preflight.py
+```
+
+It checks the worker is runnable, deps are installed, the device (MPS/CPU), the golden dataset is
+cached, the DB exists, and the seed bundle is intact, including tabular modality and metric-over-baseline.
+Exit 0 = ready; any `[FAIL]` lists exactly what to fix. Optional datasets and stretch-only dependencies
+are warnings. Then confirm the human-only items:
+
 - [ ] App builds and opens without errors
 - [ ] At least **one tabular** dataset cached locally (no download during demo)
-      — run `cd worker && .venv/bin/python scripts/prefetch.py` to cache all tabular datasets ahead of time
+      — run `cd worker && .venv/bin/python scripts/prefetch.py` to cache tabular datasets ahead of time
+      (add `--all` to also cache the image/text datasets for stretch demos)
 - [ ] Run the golden path **once end-to-end**; note actual accuracy and training time
 - [ ] Open a completed **model card** in advance (backup tab or PDF export)
 - [ ] **Experiment history** has at least one prior run (shows iteration story)
@@ -47,7 +59,7 @@ Use **MPS** for Phase 2/3 live demos when you want GPU speed on a MacBook—no C
 
 **Rehearsal checklist**
 
-- [ ] `python -c "import torch; print(torch.backends.mps.is_available())"` → `True`
+- [ ] `python -c “import torch; print(torch.backends.mps.is_available())”` → `True`
 - [ ] Timed one image job and one text job on **MPS**; note minutes on presentation hardware
 - [ ] If MPS OOM or op error: worker auto-retries on CPU (keep Fallback A anyway)
 
@@ -59,6 +71,26 @@ Use **MPS** for Phase 2/3 live demos when you want GPU speed on a MacBook—no C
 **If MPS misbehaves during judging**
 
 Say: “Metal hiccup—we fall back to CPU or this morning’s run,” then use **Fallback A**.
+
+---
+
+## Agent modes
+
+DocLab supports three planning modes via `DOCLAB_AGENT_MODE`:
+
+| Mode | Behavior | Demo use |
+|------|----------|----------|
+| `rules` (default) | Keyword-based parsing and dataset selection | **Live demo** (no API key needed, works offline) |
+| `hybrid` | Rules + LLM for ambiguous goals | Optional for Q&A if asked about AI features |
+| `llm` | LLM-first for all parsing and selection | Not recommended for live demo (network dependency) |
+
+**Live demo:** Use `rules` mode (default). No API key needed, works offline, identical behavior to all milestone testing.
+
+**Q&A:** If judges ask about AI/LLM features, mention hybrid mode is available but emphasize:
+- Training always runs locally (no cloud)
+- LLM only helps parse ambiguous goals and pick datasets
+- Falls back to rules if LLM fails
+- Never show API keys in demo
 
 ---
 

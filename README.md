@@ -116,6 +116,49 @@ Optional, for an offline demo: `python worker/scripts/prefetch.py` pre-caches th
 Data and experiments are stored under `~/.doclab/` (`doclab.db`, `datasets/<id>/`,
 `experiments/<id>/`), created on first run. See [spec.md](./Current/spec.md) for details.
 
+### Environment Variables
+
+DocLab supports optional LLM-assisted planning for ambiguous goals:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `DOCLAB_AGENT_MODE` | `rules` (keyword-based) \| `hybrid` (rules + LLM) \| `llm` (LLM-first) | `rules` |
+| `DOCLAB_LLM_PROVIDER` | `openai` \| `anthropic` | `openai` |
+| `OPENAI_API_KEY` | Your OpenAI API key (if using OpenAI) | - |
+| `ANTHROPIC_API_KEY` | Your Anthropic API key (if using Anthropic) | - |
+| `DOCLAB_LLM_MODEL` | Model name | `gpt-4o-mini` or `claude-3-5-haiku-20241022` |
+| `HF_TOKEN` | Optional Hugging Face token for dataset downloads | - |
+
+**Default behavior (no API key):** DocLab uses rule-based planning only. The app works identically without any LLM configuration.
+
+**Hybrid mode:** LLM assists only when goals are ambiguous (long or conflicting keywords). Falls back to rules if LLM fails.
+
+**Security:** API keys are read by Rust only, never exposed to the frontend bundle. LLM calls happen locally via the Tauri backend. Training always runs locally—no data leaves your machine.
+
+---
+
+## Try a saved prototype
+
+After training completes, DocLab saves model checkpoints locally. You can test your trained prototypes with new inputs directly from the Results screen:
+
+- **Tabular models**: Paste a JSON object with feature names and values matching the training schema
+- **Image models**: Select a local test image and get a prediction with confidence score
+- **Text models**: Paste text and generate a summary
+
+**Important:** Use only de-identified, synthetic, or public test inputs. Predictions are for research and prototyping only—not for clinical care.
+
+Checkpoints are stored in `~/.doclab/experiments/<id>/checkpoints/` and include:
+- Model weights (`model.joblib`, `model.pt`, or LoRA adapter)
+- Preprocessing metadata
+- Manifest with model configuration
+
+To run predictions from the command line:
+```bash
+cd worker
+source .venv/bin/activate
+python -m doclab_worker --predict path/to/predict_request.json
+```
+
 ---
 
 ## Documentation

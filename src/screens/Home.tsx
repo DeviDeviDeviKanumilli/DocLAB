@@ -48,7 +48,7 @@ export function Home() {
   }
 
   return (
-    <AppShell showSearch>
+    <AppShell title="New Prototype">
       <div className="flex min-h-full flex-col items-center justify-center px-8 py-12">
         <div className="w-full max-w-[720px] animate-fade-in-up">
           <h2 className="mb-8 text-center font-headline-lg text-[28px] leading-9 font-semibold text-primary tracking-tight">
@@ -69,8 +69,8 @@ export function Home() {
             />
             <div className="flex items-center justify-between px-3 pb-2">
               <div className="flex items-center gap-1.5 font-label-sm text-label-sm text-text-muted">
-                <Icon name="attach_file" size={16} />
-                Attach dataset
+                <Icon name="database" size={16} />
+                Curated registry only
               </div>
               <button
                 onClick={() => start(goal)}

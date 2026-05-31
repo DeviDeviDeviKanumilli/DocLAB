@@ -1,7 +1,7 @@
 // Dataset selection from curated marketplace
 // Queries Tauri backend and ranks results
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/tauri";
 import type { Dataset } from "../types/tauri";
 import type { Intent } from "./parser";
 
@@ -9,6 +9,8 @@ export interface DatasetSelection {
   dataset_id: string;
   dataset_name: string;
   rationale: string;
+  llm_used?: boolean;
+  llm_fallback?: boolean;
 }
 
 export async function selectDataset(intent: Intent): Promise<DatasetSelection> {
@@ -38,7 +40,7 @@ export async function selectDataset(intent: Intent): Promise<DatasetSelection> {
   };
 }
 
-function extractKeywords(goal: string): string[] {
+export function extractKeywords(goal: string): string[] {
   const lower = goal.toLowerCase();
   const keywords = [
     "readmission",

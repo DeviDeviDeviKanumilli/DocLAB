@@ -25,6 +25,8 @@ via the LogisticRegression fallback, but the intended path is XGBoost.
 
 `--help` runs on the standard library alone (no venv needed for the M0 healthcheck).
 
+**Note on LLM planning:** Goal parsing and dataset selection happen in the Rust backend (Tauri), not in this Python worker. The worker only consumes `plan.json` and trains models locally. LLM calls (if configured) are handled by Rust to keep API keys secure.
+
 ## Running a job
 
 ```bash
@@ -38,6 +40,14 @@ On success, writes `metrics.json` beside the plan and exits 0. On failure, write
 
 ```bash
 .venv/bin/python -m pytest tests
+```
+
+## Demo prep
+
+```bash
+.venv/bin/python scripts/prefetch.py       # cache the golden tabular datasets
+.venv/bin/python scripts/prefetch.py --all # optional: cache image/text too
+.venv/bin/python scripts/preflight.py      # verify demo-readiness without network
 ```
 
 ## Runtime data

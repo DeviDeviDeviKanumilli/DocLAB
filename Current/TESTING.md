@@ -87,6 +87,34 @@ def test_metrics_contract_and_examples(monkeypatch, tmp_path):
 These are product requirements, not nice-to-haves. A new worker path is not done
 until its tests cover:
 
+### Predict / Try path tests
+
+**Location:** `worker/tests/test_predict.py`
+
+**Pattern:** Mock checkpoint files and model loading; verify dispatch routing and error codes.
+
+```python
+def test_tabular_predict_with_mock_checkpoint(monkeypatch, tmp_path):
+    # Create fake checkpoints/manifest.json, preprocess.json, model.joblib
+    # Mock joblib.load to return fake model
+    # Call predict() and verify result structure
+```
+
+**Contract:**
+- `predict_request.json`: `{schema_version, experiment_id, experiment_dir, input: {type, value}}`
+- `prediction.json`: `{schema_version, prediction, confidence, detail, warning}`
+- Input types: `tabular_json`, `image_path`, `text`
+
+**CLI test:**
+```bash
+cd worker
+python -m doclab_worker --predict tests/fixtures/predict_request.json
+```
+
+**Live Try:** Manual smoke test after training; not covered by unit tests.
+
+---
+
 1. **Metrics shape** — exact key set, `schema_version == 1`, `metric_value` and
    `baseline_metric` in `[0, 1]`, integer counts > 0.
 2. **Determinism** — same plan run twice → identical `metric_value` (seed works).

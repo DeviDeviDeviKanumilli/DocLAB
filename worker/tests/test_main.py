@@ -35,9 +35,10 @@ def _write_plan(tmp_path: Path, **overrides) -> Path:
 def test_image_plan_dispatches_to_image_worker(monkeypatch, tmp_path):
     calls = {}
 
-    def fake_run_job(plan, data_root):
+    def fake_run_job(plan, data_root, job_dir):
         calls["plan"] = plan
         calls["data_root"] = data_root
+        calls["job_dir"] = job_dir
         return {"primary_metric": "accuracy", "model_type": "cnn"}
 
     monkeypatch.setattr(image, "run_job", fake_run_job)
@@ -59,9 +60,10 @@ def test_image_plan_dispatches_to_image_worker(monkeypatch, tmp_path):
 def test_text_plan_dispatches_to_text_worker(monkeypatch, tmp_path):
     calls = {}
 
-    def fake_run_job(plan, data_root):
+    def fake_run_job(plan, data_root, job_dir):
         calls["plan"] = plan
         calls["data_root"] = data_root
+        calls["job_dir"] = job_dir
         return {"primary_metric": "rouge_l", "model_type": "lora_t5_small"}
 
     monkeypatch.setattr(text, "run_job", fake_run_job)

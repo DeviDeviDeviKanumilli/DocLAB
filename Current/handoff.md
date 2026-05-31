@@ -20,6 +20,7 @@ Milestone status (see `Current/MILESTONES.md` for checklists, `Current/M*_PLAN.m
 - ✅ **M8** — hardening: prefetch, friendly errors, disclaimers audit, Fallback A seed run.
 - ✅ **M9** — image CNN path (PyTorch), `resolve_device()`, MPS→CPU fallback.
 - ✅ **M10** — text summarization path (LoRA t5-small), ROUGE-L, examples in card.
+- ✅ **M12** — checkpoints + Try prototype: all modalities save weights, Results/Models Try UI, predict tests.
 - ◐ **M11** — demo rehearsal: machine items done (MPS warmup, Fallbacks A/B); presenter items open.
 
 Most recent work: the `feat/ui-shell` motion/visual polish was merged into `master` (re-applied
@@ -35,9 +36,12 @@ retired. `master` is synced with origin.
 - `src-tauri/` — Rust shell: `lib.rs` (Tauri commands), `experiments.rs` (orchestration + model
   card + best-run), `marketplace.rs`, `db.rs` (data root, tables, `add_column_if_missing` migration).
 - `worker/` — Python `doclab_worker`: `__main__.py` (modality dispatch), `tabular.py`, `image.py`,
-  `text.py`, `device.py`, `errors.py`; `scripts/prefetch.py`; `tests/` (tabular/image/text).
+  `text.py`, `device.py`, `errors.py`, `predict.py`; `scripts/prefetch.py`, `scripts/build_seed_checkpoint.py`; `tests/` (tabular/image/text/predict).
 - `marketplace/datasets.yaml` — curated entries (tabular ×2, image ×1, text ×1), all wired.
 - Runtime root `~/.doclab/` (`doclab.db`, `datasets/<id>/`, `experiments/<id>/`) created on startup.
+- Checkpoints: `~/.doclab/experiments/<id>/checkpoints/` with `manifest.json`, model files, preprocessing metadata.
+- Try prototype: Results screen after completed run; Models screen Try button; supports tabular/image/text.
+- Predict: `python -m doclab_worker --predict predict_request.json` or Tauri `run_predict` command.
 
 Docs (source of truth): `Current/spec.md`, `Current/MILESTONES.md`, `Current/DEMO.md`,
 `Current/TESTING.md`, `Current/UI.md`, per-milestone `Current/M*_PLAN.md`, `README.md`,

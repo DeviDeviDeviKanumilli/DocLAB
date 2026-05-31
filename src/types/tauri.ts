@@ -55,6 +55,7 @@ export interface ExperimentSummary {
   metricValue: number | null;
   baselineMetric: number | null;
   isBest: boolean;
+  checkpointPath: string | null;
 }
 
 export interface ExperimentDetail extends ExperimentSummary {
@@ -72,4 +73,23 @@ export interface ExperimentDetail extends ExperimentSummary {
   errorMessage: string | null;
   metrics: unknown | null;
   error: unknown | null;
+}
+
+export interface PredictInput {
+  inputType: "image_path" | "text" | "tabular_json";
+  value: string;
+}
+
+export interface PredictionResult {
+  modality: string;
+  prediction: string;
+  confidence: number | null;
+  detail: string;
+  warning: string;
+}
+
+export interface AgentStatus {
+  mode: "rules" | "hybrid" | "llm";
+  llmConfigured: boolean;
+  provider?: "openai" | "anthropic";
 }

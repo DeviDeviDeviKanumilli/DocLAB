@@ -14,7 +14,7 @@ WORKER_ROOT = Path(__file__).parent.parent
 METRICS_KEYS = {
     "schema_version", "primary_metric", "metric_value", "baseline_metric",
     "device", "seed", "split", "n_train", "n_val", "n_test",
-    "model_type", "framework",
+    "model_type", "framework", "checkpoint_dir",
 }
 
 

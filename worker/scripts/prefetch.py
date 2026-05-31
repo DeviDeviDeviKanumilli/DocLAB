@@ -5,9 +5,10 @@ Run once during demo setup so the live golden path needs no network:
     cd worker && .venv/bin/python scripts/prefetch.py
 
 By default it prefetches every tabular dataset in marketplace/datasets.yaml.
-Pass dataset ids to limit it:
+Pass dataset ids to limit it, or --all to cache every modality (image/text too):
 
     .venv/bin/python scripts/prefetch.py diabetes_readmission
+    .venv/bin/python scripts/prefetch.py --all
 
 Mirrors the worker's cache path (data_root/datasets/<id>) so a later training
 run finds the dataset already on disk.
@@ -32,10 +33,14 @@ def data_root() -> Path:
 def main(argv: list[str]) -> int:
     market = yaml.safe_load(MARKETPLACE.read_text())
     datasets = market.get("datasets", [])
-    wanted = set(argv)
+
+    cache_all = "--all" in argv
+    wanted = {a for a in argv if not a.startswith("--")}
 
     if wanted:
         selected = [d for d in datasets if d.get("id") in wanted]
+    elif cache_all:
+        selected = list(datasets)
     else:
         selected = [d for d in datasets if d.get("data_type") == "tabular"]
 

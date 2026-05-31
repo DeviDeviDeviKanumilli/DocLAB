@@ -1,3 +1,4 @@
+mod agent_llm;
 mod db;
 mod experiments;
 mod marketplace;
@@ -108,6 +109,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(market)
         .invoke_handler(tauri::generate_handler![
             greet,
@@ -116,7 +118,11 @@ pub fn run() {
             create_plan,
             run_experiment,
             list_experiments,
-            get_experiment
+            get_experiment,
+            experiments::run_predict,
+            agent_llm::get_agent_status,
+            agent_llm::agent_parse_intent,
+            agent_llm::agent_pick_dataset
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

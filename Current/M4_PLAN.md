@@ -6,6 +6,8 @@ M4 was delivered via the `feat/ui-shell` branch and merged into master at commit
 
 M4 is **presentation-layer only** — all workflow screens use hardcoded mock data. The only live backend integration is `worker_healthcheck` in Settings. M5 will replace the mocks with live Tauri calls.
 
+**Post-M11 hardening note:** the current `src/` implementation has since moved beyond this retroactive M4 snapshot. Experiments, Datasets, Models, Plan, Training, and Results now use live Tauri/agent data where applicable; the mock Models cards and inert shell actions described below are historical, not the current behavior.
+
 ## What Was Delivered
 
 ### Screens (8 total)
