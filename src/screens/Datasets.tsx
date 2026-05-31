@@ -22,6 +22,8 @@ export function Datasets() {
     navigate("home", {
       attachedDataset: dataset,
       prefillGoal: (params.goal as string) ?? "",
+      // Preserve any uploaded file so attaching a dataset doesn't drop it.
+      upload: (params.upload as string) ?? null,
     });
   }
 

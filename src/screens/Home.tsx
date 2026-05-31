@@ -44,7 +44,9 @@ export function Home() {
   const [attached, setAttached] = useState<Dataset | null>(
     (params.attachedDataset as Dataset) ?? null,
   );
-  const [upload, setUpload] = useState<string | null>(null);
+  const [upload, setUpload] = useState<string | null>(
+    (params.upload as string) ?? null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function start(text: string) {
@@ -121,12 +123,7 @@ export function Home() {
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) {
-                      // One data source at a time: an upload replaces any
-                      // attached curated dataset.
-                      setUpload(f.name);
-                      setAttached(null);
-                    }
+                    if (f) setUpload(f.name);
                     e.target.value = "";
                   }}
                 />
@@ -141,7 +138,7 @@ export function Home() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("datasets", { goal })}
+                  onClick={() => navigate("datasets", { goal, upload })}
                   className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-label-sm text-label-sm transition-all active:scale-[0.98] ${
                     attached
                       ? "border-border-strong bg-surface-muted text-text-primary"
