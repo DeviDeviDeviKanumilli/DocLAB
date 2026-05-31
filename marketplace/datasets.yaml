@@ -1,0 +1,4 @@
+# DocLab curated dataset marketplace (source of truth).
+# Real tabular entries are added in M1. The agent may ONLY select dataset
+# ids present in this file — never live Hugging Face search at runtime.
+datasets: []

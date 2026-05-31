@@ -56,20 +56,21 @@ Judge-pass = **M0 + M1 + M2 + M3 + M4 + M5 + minimal model card (M6 subset) + on
 The golden demo path: type goal → approve plan → train XGBoost locally → accuracy + baseline
 + model card. Everything here is required for judging.
 
-## M0 — Repo scaffold & toolchain ☐ (P0)
+## M0 — Repo scaffold & toolchain ☑ (P0)
 
 Stand up the three runtimes so later milestones have somewhere to land.
 
-- [ ] `src/` — Tauri + React + Tailwind app boots to a blank Home screen (`npm run tauri dev`).
-- [ ] `worker/` — Python package `doclab_worker` with `__main__.py`, venv, `requirements.txt`
+- [x] `src/` — Tauri + React + Tailwind app boots to a blank Home screen (`npm run tauri dev`).
+- [x] `worker/` — Python package `doclab_worker` with `__main__.py`, venv, `requirements.txt`
       (pandas, scikit-learn, xgboost to start).
-- [ ] Rust side (`src-tauri/`) compiles and can shell out to a dummy `python -m doclab_worker`.
-- [ ] `marketplace/datasets.yaml` exists (can be empty list).
-- [ ] Decide + document data root: `~/.doclab/` vs `./doclab/` (spec open decision → recommend `~/.doclab/`).
-- [ ] **Seed fallback bundle** — drop a hand-written `experiments/_demo_seed/` with sample
-      `plan.json` / `metrics.json` / `model_card.md` (per DEMO.md Fallback B). De-risks integration
-      early and gives M11 something to point at from day one. Refine as real artifacts firm up.
-- [ ] Root `.gitignore` covers `node_modules/`, `.venv/`, `target/`, `dist/`, `doclab/`, `*.db`.
+- [x] Rust side (`src-tauri/`) compiles and can shell out to a dummy `python -m doclab_worker`.
+- [x] `marketplace/datasets.yaml` exists (can be empty list).
+- [x] Decide + document data root: `~/.doclab/` vs `./doclab/` (spec open decision → recommend `~/.doclab/`).
+- [x] **Seed fallback bundle** — committed at `demo/seed_experiment/` with sample
+      `plan.json` / `metrics.json` / `model_card.md` (per DEMO.md Fallback B). _Deviation: `demo/`
+      not runtime `experiments/_demo_seed/`, which is gitignored._ De-risks integration early and
+      gives M11 something to point at from day one. Refine as real artifacts firm up.
+- [x] Root `.gitignore` covers `node_modules/`, `.venv/`, `target/`, `dist/`, `doclab/`, `*.db`.
 
 **Exit:** `npm run tauri dev` opens a window; `python -m doclab_worker --help` runs; Rust build green.
 

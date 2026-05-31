@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "_note": "Placeholder Fallback B metrics. Replaced with a real run once M2/M5 land.",
+  "primary_metric": "accuracy",
+  "metric_value": 0.83,
+  "baseline_metric": 0.58,
+  "device": "cpu",
+  "seed": 42,
+  "split": [0.8, 0.1, 0.1],
+  "n_train": 0,
+  "n_val": 0,
+  "n_test": 0,
+  "model_type": "xgboost",
+  "framework": "xgboost"
+}
