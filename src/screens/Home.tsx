@@ -121,7 +121,12 @@ export function Home() {
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) setUpload(f.name);
+                    if (f) {
+                      // One data source at a time: an upload replaces any
+                      // attached curated dataset.
+                      setUpload(f.name);
+                      setAttached(null);
+                    }
                     e.target.value = "";
                   }}
                 />
