@@ -62,6 +62,7 @@ export interface ExperimentDetail extends ExperimentSummary {
   metricsPath: string | null;
   errorPath: string | null;
   modelCardPath: string | null;
+  modelCardContent: string | null;
   workerStdout: string | null;
   workerStderr: string | null;
   errorCode: string | null;

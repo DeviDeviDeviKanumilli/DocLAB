@@ -58,11 +58,12 @@ fn create_plan(
 
 #[tauri::command]
 fn run_experiment(
+    state: tauri::State<Marketplace>,
     plan: WorkerPlan,
     goal_text: String,
     agent_artifacts: AgentArtifacts,
 ) -> Result<ExperimentDetail, String> {
-    experiments::run_experiment(plan, goal_text, agent_artifacts)
+    experiments::run_experiment(&state, plan, goal_text, agent_artifacts)
 }
 
 #[tauri::command]

@@ -175,21 +175,23 @@ Wire the agent together so a typed goal produces a real trained model. **This is
 **Exit (Phase 1 spec exit criteria):** Type the readmission goal → approve plan → see test
 accuracy + majority-class baseline on Results, end-to-end on a laptop in **< 5 min**.
 
-## M6 — Model card generation ☐ (P0) — depends on M5
+## M6 — Model card generation ☑ (P0) — depends on M5
 
 Auto-generate the doctor-facing markdown card from the run. Uses the spec template verbatim.
 
 > **🔒 Judge-pass subset:** a readable card with result + baseline + the non-clinical disclaimer
 > is enough to pass. The full template (all limitation/reproducibility sections) is polish.
 
-- [ ] **(🔒 minimum)** Render result + baseline + non-clinical disclaimer into `model_card.md`.
-- [ ] (polish) Full template per spec: Goal, Intended use, Summary (dataset/task/model/result),
+- [x] **(🔒 minimum)** Render result + baseline + non-clinical disclaimer into `model_card.md`.
+- [x] (polish) Full template per spec: Goal, Intended use, Summary (dataset/task/model/result),
       Limitations, Risks, Reproducibility (`hf_id@revision`, seed, split, hyperparams).
-- [ ] Inject **sanity check** into the card: if `metric_value ≈ baseline_metric`, add
-      *"Model may not be learning signal."*
-- [ ] Pull dataset-specific limitation line from the marketplace entry.
-- [ ] Always include the non-clinical disclaimer + "research/prototyping only".
-- [ ] In-app viewer renders the card; store `model_card_path` on the experiment row.
+- [x] Inject **sanity check** into the card: if `metric_value ≈ baseline_metric`, add
+      *"Model may not be learning signal."* _Triggers when `metric_value <= baseline + 0.02`._
+- [x] Pull dataset-specific limitation line from the marketplace entry.
+- [x] Always include the non-clinical disclaimer + "research/prototyping only".
+- [x] In-app viewer renders the card; store `model_card_path` on the experiment row.
+      _Card text also returned via `model_card_content` in `ExperimentDetail`; Results renders
+      with `react-markdown` + `@tailwindcss/typography`._
 
 **Exit:** every completed run has a readable `model_card.md` with result, baseline, limitations, risks.
 

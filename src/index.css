@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* DocLab design system — ported from Current/UI.md (Stitch mockups) to Tailwind v4.
    Monochrome clinical/technical aesthetic: black primary, near-white surfaces,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import ReactMarkdown from "react-markdown";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { Badge } from "../components/Badge";
@@ -154,7 +155,7 @@ export function Results() {
               </p>
             </div>
 
-            {/* Model card placeholder */}
+            {/* Model card */}
             <div className="overflow-hidden rounded-xl border border-border">
               <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <div className="flex items-center gap-2">
@@ -163,44 +164,22 @@ export function Results() {
                     Model card
                   </h3>
                 </div>
+                <button className="flex items-center gap-1 font-label-sm text-label-sm text-text-muted underline underline-offset-4 transition-colors hover:text-primary">
+                  <Icon name="download" size={16} /> Export PDF
+                </button>
               </div>
 
-              <div className="p-6">
-                <div className="mb-6 rounded-lg border border-border bg-surface-muted p-4">
-                  <p className="font-body-md text-text-secondary">
-                    <strong>Goal:</strong> {detail.goalText}
-                  </p>
-                  <p className="mt-2 font-body-md text-text-secondary">
-                    <strong>Dataset:</strong> {detail.datasetId}
-                  </p>
-                  <p className="mt-2 font-body-md text-text-secondary">
-                    <strong>Model:</strong> {detail.modelType} ({detail.framework})
-                  </p>
-                  <p className="mt-2 font-body-md text-text-secondary">
-                    <strong>Result:</strong> {metricPercent}% accuracy (baseline: {baselinePercent}%)
-                  </p>
-                  <p className="mt-2 font-body-md text-text-secondary">
-                    <strong>Device:</strong> {detail.device}
+              {detail.modelCardContent ? (
+                <div className="prose prose-sm max-w-none p-6">
+                  <ReactMarkdown>{detail.modelCardContent}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <p className="font-body-md text-text-muted">
+                    Model card not available for this experiment.
                   </p>
                 </div>
-
-                <div className="rounded-lg border border-warning-text/20 bg-warning-bg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon name="warning" className="text-warning-text" />
-                    <h4 className="font-headline-md text-headline-md text-warning-text">
-                      Disclaimer
-                    </h4>
-                  </div>
-                  <p className="font-body-md text-text-secondary">
-                    This is a research prototype for exploration only. Not validated for clinical use.
-                    Do not use for diagnosis, treatment decisions, or patient care.
-                  </p>
-                </div>
-
-                <p className="mt-4 font-label-sm text-text-muted italic">
-                  Full model card generation coming in M6.
-                </p>
-              </div>
+              )}
             </div>
           </>
         )}
