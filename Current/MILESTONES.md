@@ -117,23 +117,28 @@ The Python engine. JSON in (`plan.json`) → JSON out (`metrics.json`). **Contra
 
 **Exit:** run worker by hand on a sample plan → valid `metrics.json` with accuracy + baseline.
 
-## M3 — Rust orchestration & SQLite ☐ (P0) — depends on M0
+## M3 — Rust orchestration & SQLite ☑ (P0) — depends on M0
 
 The Rust shell owns jobs, file paths, and the experiment database.
 
-- [ ] Create data root + subdirs on first run: `doclab.db`, `datasets/`, `experiments/`.
-- [ ] SQLite schema (migrations). Start with a **minimal P0 schema** — only what M5–M7 read/write:
-      `id, created_at, goal_text, dataset_id, primary_metric, metric_value, baseline_metric,
-      model_card_path, plan_path`. **Defer** these until needed: `model_type, framework,
-      dataset_size_warning, device, checkpoint_path, is_best` (add in M7/M9 via migration).
-      A narrow first schema means fewer migration/debug surprises before the first E2E run.
-- [ ] Job runner: write `plan.json` to `experiments/<id>/`, spawn worker, capture stdout/stderr.
-- [ ] Detect worker success (exit 0 + valid `metrics.json`) vs failure (non-zero + error blob).
-- [ ] Read `metrics.json` back, insert an `experiments` row.
-- [ ] Tauri commands exposed to the frontend: `create_plan`, `run_experiment`, `list_experiments`, `get_experiment`.
-- [ ] Generate unique experiment ids (timestamp + short random); never collide.
+- [x] Create data root + subdirs on first run: `doclab.db`, `datasets/`, `experiments/`.
+- [x] SQLite schema: 19-column `experiments` table (wide schema avoids ALTER churn; includes
+      `id, created_at_ms, updated_at_ms, status, goal_text, dataset_id, primary_metric,
+      metric_value, baseline_metric, model_type, framework, device, plan_path, metrics_path,
+      error_path, model_card_path, worker_stdout, worker_stderr, error_code, error_message`).
+      Deferred: `is_best` (M7), `checkpoint_path` (not needed for tabular).
+- [x] Job runner: write `plan.json` to `experiments/<id>/`, spawn worker via venv-first Python
+      resolution (`DOCLAB_PYTHON` → `worker/.venv/bin/python` → `python3`), capture stdout/stderr.
+- [x] Detect worker success (exit 0 + valid `metrics.json` with `schema_version:1`) vs failure
+      (non-zero + `error.json` blob or stderr).
+- [x] Read `metrics.json` back, insert/update `experiments` row (`running → complete/failed`).
+- [x] Tauri commands exposed to the frontend: `create_plan`, `run_experiment`, `list_experiments`, `get_experiment`.
+- [x] Generate unique experiment ids: `exp_<unix_ms>_<8-char-random>` via `uuid` crate; collision-tested.
 
 **Exit:** a Tauri command kicks off the worker and a finished run lands as a SQLite row + files on disk.
+
+**Evidence:** `cargo test -q` → 11 passed (6 marketplace, 5 experiments); ignored worker smoke
+test → green, asserts `model_type == "xgboost"` (venv-first Python works); `npm run build` → 47 modules.
 
 ## M4 — UI shell & screens ☐ (P0) — depends on M0 (mock data ok until M5)
 

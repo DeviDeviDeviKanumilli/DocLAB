@@ -1,9 +1,11 @@
 mod db;
+mod experiments;
 mod marketplace;
 
+use experiments::{ExperimentDetail, ExperimentSummary, PlanPreview, WorkerPlan};
+use marketplace::{Dataset, Marketplace};
 use std::path::PathBuf;
 use std::process::Command;
-use marketplace::{Dataset, Marketplace};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -38,7 +40,35 @@ fn query_datasets(
     data_type: Option<String>,
     task_type: Option<String>,
 ) -> Vec<Dataset> {
-    state.query(keyword.as_deref(), data_type.as_deref(), task_type.as_deref())
+    state.query(
+        keyword.as_deref(),
+        data_type.as_deref(),
+        task_type.as_deref(),
+    )
+}
+
+#[tauri::command]
+fn create_plan(
+    state: tauri::State<Marketplace>,
+    goal_text: String,
+    dataset_id: Option<String>,
+) -> Result<PlanPreview, String> {
+    experiments::create_plan(&state, goal_text, dataset_id)
+}
+
+#[tauri::command]
+fn run_experiment(plan: WorkerPlan, goal_text: String) -> Result<ExperimentDetail, String> {
+    experiments::run_experiment(plan, goal_text)
+}
+
+#[tauri::command]
+fn list_experiments() -> Result<Vec<ExperimentSummary>, String> {
+    experiments::list_experiments()
+}
+
+#[tauri::command]
+fn get_experiment(id: String) -> Result<ExperimentDetail, String> {
+    experiments::get_experiment(id)
 }
 
 fn marketplace_path() -> PathBuf {
@@ -51,8 +81,8 @@ fn marketplace_path() -> PathBuf {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // YAML is the source of truth; a bad index is fatal at startup (fail loud).
-    let market = Marketplace::load(&marketplace_path())
-        .expect("failed to load curated dataset marketplace");
+    let market =
+        Marketplace::load(&marketplace_path()).expect("failed to load curated dataset marketplace");
 
     // SQLite is a mirror for M3+ joins, NOT the query hot path — a failure
     // here is logged but must not block the in-memory marketplace.
@@ -71,9 +101,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             worker_healthcheck,
-            query_datasets
+            query_datasets,
+            create_plan,
+            run_experiment,
+            list_experiments,
+            get_experiment
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

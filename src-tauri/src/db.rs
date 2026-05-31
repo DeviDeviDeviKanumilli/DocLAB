@@ -8,15 +8,24 @@ pub fn data_root() -> Result<PathBuf, String> {
     let root = home.join(".doclab");
     std::fs::create_dir_all(&root)
         .map_err(|e| format!("cannot create data root {}: {e}", root.display()))?;
+    std::fs::create_dir_all(root.join("datasets"))
+        .map_err(|e| format!("cannot create datasets dir: {e}"))?;
+    std::fs::create_dir_all(root.join("experiments"))
+        .map_err(|e| format!("cannot create experiments dir: {e}"))?;
     Ok(root)
 }
 
-/// Open `~/.doclab/doclab.db` and ensure the `datasets` table exists.
+pub fn experiments_dir() -> Result<PathBuf, String> {
+    Ok(data_root()?.join("experiments"))
+}
+
+/// Open `~/.doclab/doclab.db` and ensure M1/M3 tables exist.
 pub fn open_db() -> Result<Connection, String> {
     let path = data_root()?.join("doclab.db");
-    let conn = Connection::open(&path)
-        .map_err(|e| format!("cannot open db {}: {e}", path.display()))?;
+    let conn =
+        Connection::open(&path).map_err(|e| format!("cannot open db {}: {e}", path.display()))?;
     create_datasets_table(&conn)?;
+    create_experiments_table(&conn)?;
     Ok(conn)
 }
 
@@ -35,6 +44,34 @@ fn create_datasets_table(conn: &Connection) -> Result<(), String> {
         );",
     )
     .map_err(|e| format!("cannot create datasets table: {e}"))
+}
+
+pub(crate) fn create_experiments_table(conn: &Connection) -> Result<(), String> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS experiments (
+            id              TEXT PRIMARY KEY,
+            created_at_ms   INTEGER NOT NULL,
+            updated_at_ms   INTEGER NOT NULL,
+            status          TEXT NOT NULL,
+            goal_text       TEXT NOT NULL,
+            dataset_id      TEXT NOT NULL,
+            primary_metric  TEXT,
+            metric_value    REAL,
+            baseline_metric REAL,
+            model_type      TEXT,
+            framework       TEXT,
+            device          TEXT,
+            plan_path       TEXT NOT NULL,
+            metrics_path    TEXT,
+            error_path      TEXT,
+            model_card_path TEXT,
+            worker_stdout   TEXT,
+            worker_stderr   TEXT,
+            error_code      TEXT,
+            error_message   TEXT
+        );",
+    )
+    .map_err(|e| format!("cannot create experiments table: {e}"))
 }
 
 /// Idempotent upsert of the curated index into SQLite. Re-running does not
@@ -59,4 +96,3 @@ pub fn mirror_datasets(conn: &Connection, market: &Marketplace) -> Result<(), St
     }
     Ok(())
 }
-

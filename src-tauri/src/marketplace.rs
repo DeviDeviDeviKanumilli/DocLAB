@@ -39,8 +39,8 @@ impl Marketplace {
     pub fn load(path: &Path) -> Result<Marketplace, String> {
         let text = std::fs::read_to_string(path)
             .map_err(|e| format!("cannot read marketplace {}: {e}", path.display()))?;
-        let market: Marketplace = serde_yaml::from_str(&text)
-            .map_err(|e| format!("invalid marketplace YAML: {e}"))?;
+        let market: Marketplace =
+            serde_yaml::from_str(&text).map_err(|e| format!("invalid marketplace YAML: {e}"))?;
         market.validate()?;
         Ok(market)
     }
@@ -96,10 +96,7 @@ impl Marketplace {
                 None => true,
             })
             .filter(|d| match task_type {
-                Some(tt) => d
-                    .task_types
-                    .iter()
-                    .any(|t| t.eq_ignore_ascii_case(tt)),
+                Some(tt) => d.task_types.iter().any(|t| t.eq_ignore_ascii_case(tt)),
                 None => true,
             })
             .filter_map(|d| match &kw {
@@ -156,8 +153,7 @@ datasets:
 "#;
 
     fn parse(yaml: &str) -> Result<Marketplace, String> {
-        let m: Marketplace =
-            serde_yaml::from_str(yaml).map_err(|e| format!("yaml: {e}"))?;
+        let m: Marketplace = serde_yaml::from_str(yaml).map_err(|e| format!("yaml: {e}"))?;
         m.validate()?;
         Ok(m)
     }
@@ -207,6 +203,3 @@ datasets:
         assert!(err.contains("main"), "got: {err}");
     }
 }
-
-
-
