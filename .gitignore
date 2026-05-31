@@ -36,3 +36,8 @@ doclab/
 *.njsproj
 *.sln
 *.sw?
+
+# local artifacts
+*.png
+.playwright-mcp/
+*.docx
