@@ -26,7 +26,42 @@ pub fn open_db() -> Result<Connection, String> {
         Connection::open(&path).map_err(|e| format!("cannot open db {}: {e}", path.display()))?;
     create_datasets_table(&conn)?;
     create_experiments_table(&conn)?;
+    run_migrations(&conn)?;
     Ok(conn)
+}
+
+/// Bring an existing `experiments` table up to the current schema. New columns
+/// are added here (guarded) so older `~/.doclab/doclab.db` files keep working
+/// without a destructive rebuild. `CREATE TABLE IF NOT EXISTS` covers fresh
+/// installs; this covers upgrades.
+fn run_migrations(conn: &Connection) -> Result<(), String> {
+    add_column_if_missing(conn, "experiments", "is_best", "INTEGER NOT NULL DEFAULT 0")?;
+    Ok(())
+}
+
+fn add_column_if_missing(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    decl: &str,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|e| format!("cannot inspect {table}: {e}"))?;
+    let existing: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| format!("cannot read {table} columns: {e}"))?
+        .filter_map(Result::ok)
+        .collect();
+    if existing.iter().any(|c| c == column) {
+        return Ok(());
+    }
+    conn.execute(
+        &format!("ALTER TABLE {table} ADD COLUMN {column} {decl}"),
+        [],
+    )
+    .map(|_| ())
+    .map_err(|e| format!("cannot add column {column} to {table}: {e}"))
 }
 
 fn create_datasets_table(conn: &Connection) -> Result<(), String> {
@@ -68,7 +103,8 @@ pub(crate) fn create_experiments_table(conn: &Connection) -> Result<(), String> 
             worker_stdout   TEXT,
             worker_stderr   TEXT,
             error_code      TEXT,
-            error_message   TEXT
+            error_message   TEXT,
+            is_best         INTEGER NOT NULL DEFAULT 0
         );",
     )
     .map_err(|e| format!("cannot create experiments table: {e}"))

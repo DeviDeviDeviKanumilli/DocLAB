@@ -97,6 +97,11 @@ export function Experiments() {
                         <span className="rounded bg-surface-container px-2 py-1 font-code-sm text-code-sm text-text-secondary">
                           {exp.id}
                         </span>
+                        {exp.isBest && (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-success-bg px-2 py-0.5 font-label-sm text-label-sm text-success-text">
+                            <Icon name="star" size={12} /> Best
+                          </span>
+                        )}
                       </td>
                       <td className="max-w-[300px] truncate px-4 py-3" title={exp.goalText}>
                         {exp.goalText}

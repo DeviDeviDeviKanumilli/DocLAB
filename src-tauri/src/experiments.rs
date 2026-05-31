@@ -59,6 +59,7 @@ pub struct ExperimentSummary {
     pub primary_metric: Option<String>,
     pub metric_value: Option<f64>,
     pub baseline_metric: Option<f64>,
+    pub is_best: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -87,6 +88,7 @@ pub struct ExperimentDetail {
     pub error_message: Option<String>,
     pub metrics: Option<Value>,
     pub error: Option<Value>,
+    pub is_best: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -333,6 +335,7 @@ pub fn run_experiment(
                     &String::from_utf8_lossy(&output.stdout),
                     &String::from_utf8_lossy(&output.stderr),
                 )?;
+                recompute_best_for_goal(&conn, &goal_text)?;
             }
             Err(e) => {
                 update_failed(
@@ -390,7 +393,7 @@ pub fn list_experiments() -> Result<Vec<ExperimentSummary>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, created_at_ms, updated_at_ms, status, goal_text, dataset_id,
-                    primary_metric, metric_value, baseline_metric
+                    primary_metric, metric_value, baseline_metric, is_best
              FROM experiments
              ORDER BY created_at_ms DESC",
         )
@@ -407,6 +410,7 @@ pub fn list_experiments() -> Result<Vec<ExperimentSummary>, String> {
                 primary_metric: row.get(6)?,
                 metric_value: row.get(7)?,
                 baseline_metric: row.get(8)?,
+                is_best: row.get::<_, i64>(9)? != 0,
             })
         })
         .map_err(|e| format!("cannot query experiments: {e}"))?;
@@ -500,6 +504,32 @@ fn update_complete(
     .map_err(|e| format!("cannot update completed experiment '{id}': {e}"))
 }
 
+/// Recompute the `is_best` flag across all completed runs sharing a goal.
+/// Phase 1 has no separate project id, so a "project" is everything with the
+/// same `goal_text`. The highest `metric_value` wins; ties break toward the
+/// most recent run. Clears the flag for the whole group first so exactly one
+/// row (or zero, if the group has no completed runs) ends up flagged.
+fn recompute_best_for_goal(conn: &Connection, goal_text: &str) -> Result<(), String> {
+    conn.execute(
+        "UPDATE experiments SET is_best=0 WHERE goal_text=?1",
+        params![goal_text],
+    )
+    .map_err(|e| format!("cannot clear is_best for goal: {e}"))?;
+
+    conn.execute(
+        "UPDATE experiments SET is_best=1
+         WHERE id = (
+            SELECT id FROM experiments
+            WHERE goal_text=?1 AND status='complete' AND metric_value IS NOT NULL
+            ORDER BY metric_value DESC, created_at_ms DESC
+            LIMIT 1
+         )",
+        params![goal_text],
+    )
+    .map(|_| ())
+    .map_err(|e| format!("cannot set is_best for goal: {e}"))
+}
+
 fn update_failed(
     conn: &Connection,
     id: &str,
@@ -534,7 +564,7 @@ fn get_experiment_by_id(conn: &Connection, id: &str) -> Result<ExperimentDetail,
             "SELECT id, created_at_ms, updated_at_ms, status, goal_text, dataset_id,
                     primary_metric, metric_value, baseline_metric, model_type, framework,
                     device, plan_path, metrics_path, error_path, model_card_path,
-                    worker_stdout, worker_stderr, error_code, error_message
+                    worker_stdout, worker_stderr, error_code, error_message, is_best
              FROM experiments
              WHERE id=?1",
         )
@@ -569,6 +599,7 @@ fn get_experiment_by_id(conn: &Connection, id: &str) -> Result<ExperimentDetail,
                 worker_stderr: row.get(17)?,
                 error_code: row.get(18)?,
                 error_message: row.get(19)?,
+                is_best: row.get::<_, i64>(20)? != 0,
             })
         })
         .optional()
@@ -749,6 +780,45 @@ mod tests {
     }
 
     #[test]
+    fn exactly_one_best_per_goal() {
+        let conn = conn();
+        let metrics = |value: f64| MetricsBlob {
+            schema_version: 1,
+            primary_metric: "accuracy".to_string(),
+            metric_value: value,
+            baseline_metric: 0.5,
+            model_type: "xgboost".to_string(),
+            framework: "xgboost".to_string(),
+            device: "cpu".to_string(),
+        };
+
+        // Two runs for the same goal, one for a different goal.
+        for (id, goal, value) in [
+            ("exp_a", "Predict readmission", 0.70),
+            ("exp_b", "Predict readmission", 0.82),
+            ("exp_c", "Classify x-rays", 0.91),
+        ] {
+            insert_running(&conn, id, 1, goal, "ds", "/tmp/plan.json").unwrap();
+            update_complete(&conn, id, &metrics(value), "/tmp/metrics.json", "/tmp/card.md", "", "")
+                .unwrap();
+            recompute_best_for_goal(&conn, goal).unwrap();
+        }
+
+        assert!(!get_experiment_by_id(&conn, "exp_a").unwrap().is_best);
+        assert!(get_experiment_by_id(&conn, "exp_b").unwrap().is_best);
+        // The other goal's run is best within its own group.
+        assert!(get_experiment_by_id(&conn, "exp_c").unwrap().is_best);
+
+        // A later, better run for the first goal flips the flag.
+        insert_running(&conn, "exp_d", 2, "Predict readmission", "ds", "/tmp/plan.json").unwrap();
+        update_complete(&conn, "exp_d", &metrics(0.88), "/tmp/metrics.json", "/tmp/card.md", "", "")
+            .unwrap();
+        recompute_best_for_goal(&conn, "Predict readmission").unwrap();
+        assert!(!get_experiment_by_id(&conn, "exp_b").unwrap().is_best);
+        assert!(get_experiment_by_id(&conn, "exp_d").unwrap().is_best);
+    }
+
+    #[test]
     fn metrics_parser_rejects_unknown_schema() {
         let metrics_path = temp_file("metrics.json");
         fs::write(
@@ -858,7 +928,7 @@ mod tests {
         let mut stmt = conn
             .prepare(
                 "SELECT id, created_at_ms, updated_at_ms, status, goal_text, dataset_id,
-                        primary_metric, metric_value, baseline_metric
+                        primary_metric, metric_value, baseline_metric, is_best
                  FROM experiments
                  ORDER BY created_at_ms DESC",
             )
@@ -875,6 +945,7 @@ mod tests {
                     primary_metric: row.get(6)?,
                     metric_value: row.get(7)?,
                     baseline_metric: row.get(8)?,
+                    is_best: row.get::<_, i64>(9)? != 0,
                 })
             })
             .unwrap();

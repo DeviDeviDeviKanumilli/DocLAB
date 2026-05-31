@@ -52,6 +52,7 @@ export interface ExperimentSummary {
   primaryMetric: string | null;
   metricValue: number | null;
   baselineMetric: number | null;
+  isBest: boolean;
 }
 
 export interface ExperimentDetail extends ExperimentSummary {

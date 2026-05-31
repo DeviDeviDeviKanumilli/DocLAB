@@ -195,17 +195,20 @@ Auto-generate the doctor-facing markdown card from the run. Uses the spec templa
 
 **Exit:** every completed run has a readable `model_card.md` with result, baseline, limitations, risks.
 
-## M7 — Experiment history & best run ☐ (P0) — depends on M5
+## M7 — Experiment history & best run ☑ (P0) — depends on M5
 
 The iteration story for judging.
 
 > **🔒 Judge-pass subset:** one history row that reopens its saved results is enough. Best-run
 > badging and cross-session persistence are polish.
 
-- [ ] **(🔒 minimum)** History screen lists runs from SQLite (goal, dataset, metric, date), newest first.
-- [ ] Click a row → reopen its Results + model card (read from stored paths).
-- [ ] Within one goal session ("project"), mark highest `primary_metric` as `is_best = true`; show a badge.
-- [ ] History survives app restart (reads persisted DB, not session memory).
+- [x] **(🔒 minimum)** History screen lists runs from SQLite (goal, dataset, metric, date), newest first.
+- [x] Click a row → reopen its Results + model card (read from stored paths).
+      _Results reads everything from `get_experiment`; persisted card renders on reopen._
+- [x] Within one goal session ("project"), mark highest `primary_metric` as `is_best = true`; show a badge.
+      _`recompute_best_for_goal` groups by `goal_text` (Phase 1 has no project id); "Best" badge in Experiments._
+- [x] History survives app restart (reads persisted DB, not session memory).
+      _`~/.doclab/doclab.db`; added guarded `add_column_if_missing` migration for the new `is_best` column._
 
 **Exit:** run two experiments → both appear in history → best is flagged → reopening shows saved results.
 
