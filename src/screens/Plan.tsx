@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
 import { runAgent, type AgentResult } from "../agent";
-import type { ExperimentDetail, WorkerPlan } from "../types/tauri";
+import type { WorkerPlan } from "../types/tauri";
 
 const STEPS = [
   { label: "Goal", icon: "check_circle", state: "done" },
@@ -39,6 +38,7 @@ export function Plan() {
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [copiedDataset, setCopiedDataset] = useState(false);
 
   useEffect(() => {
     runAgent(goal)
@@ -47,11 +47,12 @@ export function Plan() {
       .finally(() => setLoading(false));
   }, [goal]);
 
-  async function startTraining() {
+  function startTraining() {
     if (!agentResult) return;
     setStarting(true);
-    try {
-      const experimentDetail = await invoke<ExperimentDetail>("run_experiment", {
+    navigate("training", {
+      goal,
+      pendingRun: {
         plan: agentResult.planPreview.plan,
         goalText: goal,
         agentArtifacts: {
@@ -59,12 +60,16 @@ export function Plan() {
           selection: JSON.stringify(agentResult.selection),
           profile: JSON.stringify(agentResult.profile),
         },
-      });
-      navigate("training", { experimentId: experimentDetail.id });
-    } catch (e: any) {
-      setError(e.message || "Failed to start experiment");
-      setStarting(false);
-    }
+      },
+    });
+  }
+
+  async function copyDatasetRef() {
+    if (!agentResult) return;
+    const dataset = agentResult.planPreview.dataset;
+    await navigator.clipboard.writeText(`${dataset.hfId}@${dataset.revision}`);
+    setCopiedDataset(true);
+    window.setTimeout(() => setCopiedDataset(false), 1500);
   }
 
   if (loading) {
@@ -210,15 +215,18 @@ export function Plan() {
                   {dataset.name}
                 </p>
               </div>
-              <div className="flex items-center justify-between rounded border border-surface-tint bg-log-bg p-3">
+              <div className="flex items-center justify-between gap-3 rounded border border-surface-tint bg-log-bg p-3">
                 <code className="font-code-sm text-code-sm text-log-text">
                   {dataset.hfId}@{dataset.revision.substring(0, 7)}
                 </code>
-                <Icon
-                  name="content_copy"
-                  size={16}
-                  className="cursor-pointer text-text-muted hover:text-log-text"
-                />
+                <button
+                  type="button"
+                  onClick={copyDatasetRef}
+                  title="Copy dataset reference"
+                  className="rounded p-1 text-text-muted transition-colors hover:bg-surface-muted hover:text-log-text"
+                >
+                  <Icon name={copiedDataset ? "check" : "content_copy"} size={16} />
+                </button>
               </div>
             </div>
 
@@ -279,8 +287,11 @@ export function Plan() {
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 border-t border-border bg-background px-6 py-4">
-            <button className="rounded border border-transparent px-4 py-2 font-body-md text-text-primary transition-colors hover:border-border hover:bg-surface-muted">
-              Edit parameters
+            <button
+              onClick={() => navigate("home")}
+              className="rounded border border-transparent px-4 py-2 font-body-md text-text-primary transition-colors hover:border-border hover:bg-surface-muted"
+            >
+              Back
             </button>
             <button
               disabled={!confirmed || starting}

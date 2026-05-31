@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { CSSProperties } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/tauri";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { open } from "@tauri-apps/plugin-dialog";
 import ReactMarkdown from "react-markdown";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
@@ -8,7 +10,7 @@ import { Badge } from "../components/Badge";
 import { useRouter } from "../router";
 import { friendlyError } from "../lib/errors";
 import { useCountUp } from "../hooks/useCountUp";
-import type { ExperimentDetail } from "../types/tauri";
+import type { ExperimentDetail, PredictInput, PredictionResult } from "../types/tauri";
 
 function modelFamilyLabel(modelType?: string | null): string {
   if (modelType === "cnn") return "Medical image classifier";
@@ -43,8 +45,21 @@ function CountValue({
 export function Results() {
   const { params, navigate } = useRouter();
   const experimentId = params.experimentId as string;
+  const focusTry = params.focusTry as string | undefined;
   const [detail, setDetail] = useState<ExperimentDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [modelCardError, setModelCardError] = useState<string | null>(null);
+
+  // Try prototype state
+  const [selectedImagePath, setSelectedImagePath] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState("");
+  const [tabularInput, setTabularInput] = useState("");
+  const [predicting, setPredicting] = useState(false);
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [predictError, setPredictError] = useState<string | null>(null);
+
+  const tryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!experimentId) {
@@ -54,9 +69,17 @@ export function Results() {
 
     invoke<ExperimentDetail>("get_experiment", { id: experimentId })
       .then(setDetail)
-      .catch(console.error)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [experimentId, navigate]);
+
+  useEffect(() => {
+    if (focusTry === "true" && tryRef.current && detail) {
+      setTimeout(() => {
+        tryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [focusTry, detail]);
 
   if (loading) {
     return (
@@ -77,8 +100,14 @@ export function Results() {
     return (
       <AppShell title="Results">
         <div className="mx-auto max-w-[720px] p-8">
-          <div className="rounded-lg border border-error bg-error-bg p-6">
-            <p className="font-body-md text-text-primary">Experiment not found.</p>
+          <div className={`rounded-lg border p-6 ${
+            error
+              ? "border-warning-text/20 bg-warning-bg"
+              : "border-error bg-error-bg"
+          }`}>
+            <p className="font-body-md text-text-primary">
+              {error ? `Could not load experiment: ${error}` : "Experiment not found."}
+            </p>
             <button
               onClick={() => navigate("experiments")}
               className="mt-4 rounded border border-border bg-surface px-4 py-2 font-body-md text-text-primary transition-colors hover:bg-surface-muted"
@@ -89,6 +118,83 @@ export function Results() {
         </div>
       </AppShell>
     );
+  }
+
+  async function openModelCard() {
+    if (!detail?.modelCardPath) return;
+    setModelCardError(null);
+    try {
+      await openPath(detail.modelCardPath);
+    } catch (e) {
+      setModelCardError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function selectImage() {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "Images",
+            extensions: ["png", "jpg", "jpeg", "bmp", "gif"],
+          },
+        ],
+      });
+      if (selected && typeof selected === "string") {
+        setSelectedImagePath(selected);
+        setPrediction(null);
+        setPredictError(null);
+      }
+    } catch (e) {
+      setPredictError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function runPrediction() {
+    if (!detail || !experimentId) return;
+
+    const modality = detail.modelType === "cnn" ? "image" : detail.modelType === "lora_t5_small" ? "text" : "tabular";
+
+    let input: PredictInput;
+    if (modality === "image") {
+      if (!selectedImagePath) {
+        setPredictError("Please select an image first");
+        return;
+      }
+      input = { inputType: "image_path", value: selectedImagePath };
+    } else if (modality === "text") {
+      if (!textInput.trim()) {
+        setPredictError("Please enter text to summarize");
+        return;
+      }
+      input = { inputType: "text", value: textInput };
+    } else if (modality === "tabular") {
+      if (!tabularInput.trim()) {
+        setPredictError("Please enter JSON input");
+        return;
+      }
+      input = { inputType: "tabular_json", value: tabularInput };
+    } else {
+      setPredictError("Unknown modality");
+      return;
+    }
+
+    setPredicting(true);
+    setPredictError(null);
+    setPrediction(null);
+
+    try {
+      const result = await invoke<PredictionResult>("run_predict", {
+        experimentId,
+        input,
+      });
+      setPrediction(result);
+    } catch (e) {
+      setPredictError(friendlyError(e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPredicting(false);
+    }
   }
 
   const metricValue = detail.metricValue || 0;
@@ -131,7 +237,10 @@ export function Results() {
               View experiment
             </button>
             {detail.modelCardPath && (
-              <button className="rounded bg-primary px-4 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface">
+              <button
+                onClick={openModelCard}
+                className="rounded bg-primary px-4 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface"
+              >
                 Open model card
               </button>
             )}
@@ -218,10 +327,21 @@ export function Results() {
                     Model card
                   </h3>
                 </div>
-                <button className="flex items-center gap-1 font-label-sm text-label-sm text-text-muted underline underline-offset-4 transition-colors hover:text-primary">
-                  <Icon name="download" size={16} /> Export PDF
-                </button>
+                {detail.modelCardPath && (
+                  <button
+                    onClick={openModelCard}
+                    className="flex items-center gap-1 font-label-sm text-label-sm text-text-muted underline underline-offset-4 transition-colors hover:text-primary"
+                  >
+                    <Icon name="open_in_new" size={16} /> Open markdown
+                  </button>
+                )}
               </div>
+
+              {modelCardError && (
+                <div className="border-b border-error bg-error-bg px-5 py-3 font-label-sm text-label-sm text-error-text">
+                  Could not open model card: {modelCardError}
+                </div>
+              )}
 
               {detail.modelCardContent ? (
                 <div className="prose prose-sm max-w-none p-6">
@@ -235,6 +355,158 @@ export function Results() {
                 </div>
               )}
             </div>
+
+            {/* Try prototype section */}
+            {detail.checkpointPath ? (
+              <div ref={tryRef} className="mt-6 overflow-hidden rounded-xl border border-border">
+                <div className="flex items-center justify-between border-b border-border bg-surface px-5 py-4">
+                  <div className="flex items-center gap-2">
+                    <Icon name="science" className="text-text-secondary" />
+                    <h3 className="font-headline-lg text-headline-lg text-text-primary">
+                      Try this prototype
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="mb-4 rounded-lg border border-warning-text/20 bg-warning-bg px-4 py-3">
+                    <p className="font-label-sm text-label-sm text-warning-text">
+                      <strong>Research only</strong> — Use only de-identified, synthetic, or public test inputs. Not for diagnosis or treatment.
+                    </p>
+                  </div>
+
+                  {detail.modelType === "cnn" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="mb-2 block font-label-md text-label-md text-text-primary">
+                          Select test image
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={selectImage}
+                            disabled={predicting}
+                            className="rounded border border-border bg-surface px-4 py-2 font-body-md text-text-primary transition-colors hover:bg-surface-muted disabled:opacity-50"
+                          >
+                            Choose image...
+                          </button>
+                          {selectedImagePath && (
+                            <span className="font-code-sm text-code-sm text-text-secondary truncate max-w-md">
+                              {selectedImagePath.split("/").pop()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={runPrediction}
+                        disabled={!selectedImagePath || predicting}
+                        className="rounded bg-primary px-6 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {predicting ? "Running..." : "Run prediction"}
+                      </button>
+                    </div>
+                  )}
+
+                  {detail.modelType === "lora_t5_small" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="mb-2 block font-label-md text-label-md text-text-primary">
+                          Enter text to summarize
+                        </label>
+                        <textarea
+                          value={textInput}
+                          onChange={(e) => setTextInput(e.target.value)}
+                          disabled={predicting}
+                          placeholder="Paste medical education text here..."
+                          className="w-full rounded border border-border bg-surface px-4 py-3 font-body-md text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                          rows={6}
+                        />
+                      </div>
+
+                      <button
+                        onClick={runPrediction}
+                        disabled={!textInput.trim() || predicting}
+                        className="rounded bg-primary px-6 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {predicting ? "Generating..." : "Generate summary"}
+                      </button>
+                    </div>
+                  )}
+
+                  {(detail.modelType === "xgboost" || detail.modelType === "logistic_regression") && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="mb-2 block font-label-md text-label-md text-text-primary">
+                          Enter feature values as JSON
+                        </label>
+                        <p className="mb-2 font-label-sm text-label-sm text-text-muted">
+                          Paste a JSON object with feature names and values matching the training dataset schema.
+                          Missing keys default to 0; use numeric/boolean values.
+                        </p>
+                        <p className="mb-3 font-code-sm text-code-sm text-text-secondary">
+                          Example: {`{"age": 65, "glucose": 120, "readmitted": 0}`}
+                        </p>
+                        <textarea
+                          value={tabularInput}
+                          onChange={(e) => setTabularInput(e.target.value)}
+                          disabled={predicting}
+                          placeholder='{"age": 50, "glucose": 100}'
+                          className="w-full rounded border border-border bg-surface px-4 py-3 font-code-sm text-code-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                          rows={4}
+                        />
+                      </div>
+
+                      <button
+                        onClick={runPrediction}
+                        disabled={!tabularInput.trim() || predicting}
+                        className="rounded bg-primary px-6 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {predicting ? "Running..." : "Run prediction"}
+                      </button>
+                    </div>
+                  )}
+
+                  {predictError && (
+                    <div className="mt-4 rounded-lg border border-error bg-error-bg px-4 py-3">
+                      <p className="font-body-md text-error-text">{predictError}</p>
+                    </div>
+                  )}
+
+                  {prediction && (
+                    <div className="mt-4 rounded-lg border border-success-text/20 bg-success-bg p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Icon name="check_circle" className="text-success-text" />
+                        <h4 className="font-headline-md text-headline-md text-success-text">
+                          Prediction result
+                        </h4>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="font-body-md text-text-primary">
+                          <strong>Prediction:</strong> {prediction.prediction}
+                        </p>
+                        {prediction.confidence !== null && (
+                          <p className="font-body-md text-text-primary">
+                            <strong>Confidence:</strong> {(prediction.confidence * 100).toFixed(1)}%
+                          </p>
+                        )}
+                        <p className="font-label-sm text-label-sm text-text-muted">
+                          {prediction.detail}
+                        </p>
+                        <p className="font-label-sm text-label-sm text-warning-text">
+                          ⚠️ {prediction.warning}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-lg border border-border bg-surface-muted px-6 py-4">
+                <p className="font-body-md text-text-muted">
+                  Retrain this prototype to enable local testing. Older experiments don't have saved checkpoints.
+                </p>
+              </div>
+            )}
           </>
         )}
 

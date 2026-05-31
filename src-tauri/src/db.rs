@@ -36,6 +36,7 @@ pub fn open_db() -> Result<Connection, String> {
 /// installs; this covers upgrades.
 fn run_migrations(conn: &Connection) -> Result<(), String> {
     add_column_if_missing(conn, "experiments", "is_best", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column_if_missing(conn, "experiments", "checkpoint_path", "TEXT")?;
     Ok(())
 }
 
@@ -62,6 +63,16 @@ fn add_column_if_missing(
     )
     .map(|_| ())
     .map_err(|e| format!("cannot add column {column} to {table}: {e}"))
+}
+
+#[allow(dead_code)]
+pub(crate) fn add_column_if_missing_public(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    decl: &str,
+) -> Result<(), String> {
+    add_column_if_missing(conn, table, column, decl)
 }
 
 fn create_datasets_table(conn: &Connection) -> Result<(), String> {

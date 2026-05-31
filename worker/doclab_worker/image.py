@@ -129,9 +129,10 @@ def _train_once(model, X_tr, y_tr, device, seed):
     return model
 
 
-def run_job(plan: dict, data_root: Path) -> dict:
+def run_job(plan: dict, data_root: Path, job_dir: Path) -> dict:
     """Image classification pipeline. Returns a metrics dict matching the
     tabular contract, plus device_fallback and an optional warning."""
+    import json
     import torch
 
     seed = plan.get("seed", 42)
@@ -166,6 +167,35 @@ def run_job(plan: dict, data_root: Path) -> dict:
     counts = torch.bincount(y_te)
     baseline = float(counts.max().item() / counts.sum().item())
 
+    # Save checkpoint
+    checkpoints_dir = job_dir / "checkpoints"
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save model state dict with metadata
+    checkpoint = {
+        "state_dict": model.state_dict(),
+        "img_size": IMG_SIZE,
+        "n_classes": n_classes,
+    }
+    torch.save(checkpoint, checkpoints_dir / "model.pt")
+
+    # Extract class names if available from dataset
+    classes = []
+    if hasattr(train_ds.features["label"], "names"):
+        classes = train_ds.features["label"].names
+
+    # Save manifest
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "modality": "image",
+        "model_type": "cnn",
+        "framework": "pytorch",
+        "img_size": IMG_SIZE,
+        "n_classes": n_classes,
+        "classes": classes,
+    }
+    (checkpoints_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+
     metrics = {
         "schema_version": SCHEMA_VERSION,
         "primary_metric": plan.get("primary_metric", "accuracy"),
@@ -180,10 +210,87 @@ def run_job(plan: dict, data_root: Path) -> dict:
         "n_test": int(X_te.shape[0]),
         "model_type": "cnn",
         "framework": "pytorch",
+        "checkpoint_dir": "checkpoints",
     }
     if X_tr.shape[0] < SMALL_DATA_THRESHOLD:
         metrics["warning"] = (
             "Small dataset; high accuracy may reflect overfitting, not clinical signal."
         )
     return metrics
+
+
+def predict(checkpoints_dir: Path, image_path: str) -> dict:
+    """Load checkpoint and run inference on a single image."""
+    import json
+    import torch
+    from PIL import Image
+    from torchvision import transforms
+
+    # Load manifest
+    manifest_path = checkpoints_dir / "manifest.json"
+    if not manifest_path.exists():
+        raise WorkerError("checkpoint_missing", "load", "manifest.json not found")
+
+    manifest = json.loads(manifest_path.read_text())
+    img_size = manifest.get("img_size", IMG_SIZE)
+    n_classes = manifest.get("n_classes", 2)
+    classes = manifest.get("classes", [])
+
+    # Load model checkpoint
+    checkpoint_path = checkpoints_dir / "model.pt"
+    if not checkpoint_path.exists():
+        raise WorkerError("checkpoint_missing", "load", "model.pt not found")
+
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        model = TinyConvNet.build(img_size, n_classes)
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
+    except Exception as e:
+        raise WorkerError("checkpoint_missing", "load", f"cannot load model: {e}")
+
+    # Load and preprocess image
+    img_path = Path(image_path)
+    if not img_path.exists():
+        raise WorkerError("bad_input", "predict", f"image not found: {image_path}")
+
+    try:
+        img = Image.open(img_path)
+        if img.mode != "L":
+            img = img.convert("L")
+
+        tfm = transforms.Compose([
+            transforms.Grayscale(num_output_channels=1),
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
+        ])
+        img_tensor = tfm(img).unsqueeze(0)  # Add batch dimension
+    except Exception as e:
+        raise WorkerError("bad_input", "predict", f"cannot process image: {e}")
+
+    # Run inference
+    try:
+        with torch.no_grad():
+            output = model(img_tensor)
+            probs = torch.softmax(output, dim=1)
+            pred_idx = probs.argmax(dim=1).item()
+            confidence = probs[0, pred_idx].item()
+
+        # Map to class name if available
+        if classes and pred_idx < len(classes):
+            prediction = classes[pred_idx]
+        else:
+            prediction = f"Class {pred_idx}"
+
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "modality": "image",
+            "prediction": prediction,
+            "confidence": round(confidence, 4),
+            "detail": "Prototype label only.",
+            "warning": "Not for clinical use.",
+        }
+    except Exception as e:
+        raise WorkerError("predict_failed", "predict", f"inference failed: {e}")
+
 

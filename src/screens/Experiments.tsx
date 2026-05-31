@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState } from "react";
+import { invoke } from "../lib/tauri";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { Badge } from "../components/Badge";
@@ -22,13 +22,24 @@ export function Experiments() {
   const { navigate } = useRouter();
   const [experiments, setExperiments] = useState<ExperimentSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadExperiments = useCallback((showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    setError(null);
     invoke<ExperimentSummary[]>("list_experiments")
       .then(setExperiments)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
   }, []);
+
+  useEffect(() => {
+    loadExperiments();
+  }, [loadExperiments]);
 
   if (loading) {
     return (
@@ -39,6 +50,28 @@ export function Experiments() {
             <p className="font-headline-md text-headline-md text-text-primary">
               Loading experiments...
             </p>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppShell title="Experiments">
+        <div className="mx-auto max-w-[720px] p-8">
+          <div className="rounded-lg border border-warning-text/20 bg-warning-bg p-6">
+            <div className="mb-3 flex items-center gap-2 text-warning-text">
+              <Icon name="warning" />
+              <h3 className="font-headline-md text-headline-md">Experiment history unavailable</h3>
+            </div>
+            <p className="font-body-md text-text-primary">{error}</p>
+            <button
+              onClick={() => loadExperiments(true)}
+              className="mt-4 rounded border border-border bg-surface px-4 py-2 font-body-md text-text-primary transition-colors hover:bg-surface-muted"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </AppShell>
@@ -57,8 +90,13 @@ export function Experiments() {
               Every prototype run, newest first.
             </p>
           </div>
-          <button className="flex items-center gap-2 rounded border border-border bg-surface-container-lowest px-3 py-2 font-label-sm text-label-sm text-text-primary transition-colors hover:bg-surface-muted">
-            <Icon name="filter_list" size={16} /> Filter
+          <button
+            onClick={() => loadExperiments(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2 rounded border border-border bg-surface-container-lowest px-3 py-2 font-label-sm text-label-sm text-text-primary transition-colors hover:bg-surface-muted disabled:opacity-50"
+          >
+            <Icon name="refresh" size={16} className={refreshing ? "animate-spin" : ""} />
+            Refresh
           </button>
         </div>
 

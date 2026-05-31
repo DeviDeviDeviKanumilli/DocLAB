@@ -62,7 +62,7 @@ def test_metrics_contract_and_cpu(monkeypatch, tmp_path):
     _patch_tensors(monkeypatch, n_train=600, n_test=120)
     monkeypatch.setattr(image, "resolve_device", lambda: "cpu")
 
-    metrics = image.run_job(_plan(), tmp_path)
+    metrics = image.run_job(_plan(), tmp_path, tmp_path)
     assert metrics["model_type"] == "cnn"
     assert metrics["framework"] == "pytorch"
     assert metrics["device"] == "cpu"
@@ -79,7 +79,7 @@ def test_small_data_warning(monkeypatch, tmp_path):
     _patch_tensors(monkeypatch, n_train=120, n_test=40)
     monkeypatch.setattr(image, "resolve_device", lambda: "cpu")
 
-    metrics = image.run_job(_plan(), tmp_path)
+    metrics = image.run_job(_plan(), tmp_path, tmp_path)
     assert metrics["n_train"] == 120
     assert "warning" in metrics
     assert "overfitting" in metrics["warning"].lower()
@@ -101,7 +101,7 @@ def test_mps_failure_falls_back_to_cpu(monkeypatch, tmp_path):
 
     monkeypatch.setattr(image, "_train_once", flaky_train)
 
-    metrics = image.run_job(_plan(), tmp_path)
+    metrics = image.run_job(_plan(), tmp_path, tmp_path)
     assert metrics["device"] == "cpu"
     assert metrics["device_fallback"] is True
     assert calls["n"] == 2  # one failed MPS attempt + one CPU retry

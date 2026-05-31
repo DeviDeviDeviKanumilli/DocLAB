@@ -6,6 +6,8 @@ export interface Intent {
   modality: "tabular" | "image" | "text";
   metric_hint: "accuracy" | "auc" | "rouge" | null;
   goal_text: string;
+  llm_used?: boolean;
+  llm_fallback?: boolean;
 }
 
 export function parseGoal(goal: string): Intent {

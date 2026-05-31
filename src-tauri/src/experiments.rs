@@ -55,6 +55,22 @@ pub struct PlanPreview {
     pub summary: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct PredictInput {
+    pub input_type: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PredictionResult {
+    pub modality: String,
+    pub prediction: String,
+    pub confidence: Option<f64>,
+    pub detail: String,
+    pub warning: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentSummary {
@@ -68,6 +84,7 @@ pub struct ExperimentSummary {
     pub metric_value: Option<f64>,
     pub baseline_metric: Option<f64>,
     pub is_best: bool,
+    pub checkpoint_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -97,6 +114,7 @@ pub struct ExperimentDetail {
     pub metrics: Option<Value>,
     pub error: Option<Value>,
     pub is_best: bool,
+    pub checkpoint_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -436,6 +454,15 @@ pub fn run_experiment(
             Ok((metrics, _)) => {
                 let model_card_path =
                     generate_model_card(&experiment_dir, &goal_text, &dataset, &plan, &metrics)?;
+
+                // Check if checkpoint was saved
+                let checkpoint_manifest = experiment_dir.join("checkpoints").join("manifest.json");
+                let checkpoint_path = if checkpoint_manifest.exists() {
+                    Some("checkpoints")
+                } else {
+                    None
+                };
+
                 update_complete(
                     &conn,
                     &id,
@@ -444,6 +471,7 @@ pub fn run_experiment(
                     &model_card_path,
                     &String::from_utf8_lossy(&output.stdout),
                     &String::from_utf8_lossy(&output.stderr),
+                    checkpoint_path,
                 )?;
                 recompute_best_for_goal(&conn, &goal_text)?;
             }
@@ -503,7 +531,7 @@ pub fn list_experiments() -> Result<Vec<ExperimentSummary>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, created_at_ms, updated_at_ms, status, goal_text, dataset_id,
-                    primary_metric, metric_value, baseline_metric, is_best
+                    primary_metric, metric_value, baseline_metric, is_best, checkpoint_path
              FROM experiments
              ORDER BY created_at_ms DESC",
         )
@@ -521,6 +549,7 @@ pub fn list_experiments() -> Result<Vec<ExperimentSummary>, String> {
                 metric_value: row.get(7)?,
                 baseline_metric: row.get(8)?,
                 is_best: row.get::<_, i64>(9)? != 0,
+                checkpoint_path: row.get(10)?,
             })
         })
         .map_err(|e| format!("cannot query experiments: {e}"))?;
@@ -629,13 +658,14 @@ fn update_complete(
     model_card_path: &str,
     stdout: &str,
     stderr: &str,
+    checkpoint_path: Option<&str>,
 ) -> Result<(), String> {
     conn.execute(
         "UPDATE experiments SET
             updated_at_ms=?2, status='complete', primary_metric=?3,
             metric_value=?4, baseline_metric=?5, model_type=?6, framework=?7,
             device=?8, metrics_path=?9, model_card_path=?10, worker_stdout=?11, worker_stderr=?12,
-            error_code=NULL, error_message=NULL
+            checkpoint_path=?13, error_code=NULL, error_message=NULL
          WHERE id=?1",
         params![
             id,
@@ -650,6 +680,7 @@ fn update_complete(
             model_card_path,
             stdout,
             stderr,
+            checkpoint_path,
         ],
     )
     .map(|_| ())
@@ -716,7 +747,7 @@ fn get_experiment_by_id(conn: &Connection, id: &str) -> Result<ExperimentDetail,
             "SELECT id, created_at_ms, updated_at_ms, status, goal_text, dataset_id,
                     primary_metric, metric_value, baseline_metric, model_type, framework,
                     device, plan_path, metrics_path, error_path, model_card_path,
-                    worker_stdout, worker_stderr, error_code, error_message, is_best
+                    worker_stdout, worker_stderr, error_code, error_message, is_best, checkpoint_path
              FROM experiments
              WHERE id=?1",
         )
@@ -752,6 +783,7 @@ fn get_experiment_by_id(conn: &Connection, id: &str) -> Result<ExperimentDetail,
                 error_code: row.get(18)?,
                 error_message: row.get(19)?,
                 is_best: row.get::<_, i64>(20)? != 0,
+                checkpoint_path: row.get(21)?,
             })
         })
         .optional()
@@ -883,6 +915,22 @@ pub fn seed_demo_experiment() -> Result<(), String> {
     fs::copy(&metrics_src, &metrics_dst).map_err(|e| format!("cannot copy seed metrics: {e}"))?;
     fs::copy(&card_src, &card_dst).map_err(|e| format!("cannot copy seed card: {e}"))?;
 
+    // Copy checkpoints if they exist in seed bundle
+    let seed_checkpoints = bundle.join("checkpoints");
+    if seed_checkpoints.exists() {
+        let dest_checkpoints = dir.join("checkpoints");
+        fs::create_dir_all(&dest_checkpoints)
+            .map_err(|e| format!("cannot create checkpoints dir: {e}"))?;
+        for entry in fs::read_dir(&seed_checkpoints)
+            .map_err(|e| format!("cannot read seed checkpoints: {e}"))?
+        {
+            let entry = entry.map_err(|e| format!("cannot read checkpoint entry: {e}"))?;
+            let dest_path = dest_checkpoints.join(entry.file_name());
+            fs::copy(entry.path(), dest_path)
+                .map_err(|e| format!("cannot copy checkpoint file: {e}"))?;
+        }
+    }
+
     let (metrics, _) = parse_metrics_file(&metrics_dst)?;
     let plan: WorkerPlan = serde_json::from_str(
         &fs::read_to_string(&plan_dst).map_err(|e| format!("cannot read seed plan: {e}"))?,
@@ -901,6 +949,16 @@ pub fn seed_demo_experiment() -> Result<(), String> {
         &plan.dataset_id,
         &path_string(&plan_dst),
     )?;
+
+    // Check if demo seed has checkpoint
+    let checkpoint_path_str;
+    let checkpoint_path = if dir.join("checkpoints").join("manifest.json").exists() {
+        checkpoint_path_str = path_string(&dir.join("checkpoints"));
+        Some(checkpoint_path_str.as_str())
+    } else {
+        None
+    };
+
     update_complete(
         &conn,
         DEMO_SEED_ID,
@@ -909,9 +967,98 @@ pub fn seed_demo_experiment() -> Result<(), String> {
         &path_string(&card_dst),
         "",
         "",
+        checkpoint_path,
     )?;
     recompute_best_for_goal(&conn, &goal_text)?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn run_predict(
+    experiment_id: String,
+    input: PredictInput,
+) -> Result<PredictionResult, String> {
+    let conn = db::open_db()?;
+    let experiment = get_experiment_by_id(&conn, &experiment_id)?;
+
+    // Verify experiment is complete
+    if experiment.status != "complete" {
+        return Err(format!(
+            "experiment '{}' is not complete (status: {})",
+            experiment_id, experiment.status
+        ));
+    }
+
+    // Verify checkpoint exists
+    if experiment.checkpoint_path.is_none() {
+        return Err(format!(
+            "experiment '{}' has no saved checkpoint",
+            experiment_id
+        ));
+    }
+
+    // Get experiment directory
+    let experiment_dir = db::experiments_dir()?.join(&experiment_id);
+    let checkpoints_dir = experiment_dir.join("checkpoints");
+    let manifest_path = checkpoints_dir.join("manifest.json");
+
+    if !manifest_path.exists() {
+        return Err(format!(
+            "checkpoint manifest not found for experiment '{}'",
+            experiment_id
+        ));
+    }
+
+    // Write predict_request.json
+    let request_path = experiment_dir.join("predict_request.json");
+    let request = serde_json::json!({
+        "schema_version": SCHEMA_VERSION,
+        "experiment_dir": path_string(&experiment_dir),
+        "input": {
+            "type": input.input_type,
+            "value": input.value,
+        }
+    });
+
+    let request_text = serde_json::to_string_pretty(&request)
+        .map_err(|e| format!("cannot serialize predict request: {e}"))?;
+    fs::write(&request_path, request_text)
+        .map_err(|e| format!("cannot write predict_request.json: {e}"))?;
+
+    // Run worker predict
+    let output = Command::new(worker_python())
+        .args(["-m", "doclab_worker", "--predict"])
+        .arg(&request_path)
+        .current_dir(worker_dir())
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            let prediction_path = experiment_dir.join("prediction.json");
+            let prediction_text = fs::read_to_string(&prediction_path)
+                .map_err(|e| format!("cannot read prediction.json: {e}"))?;
+            let prediction: PredictionResult = serde_json::from_str(&prediction_text)
+                .map_err(|e| format!("prediction.json is invalid: {e}"))?;
+            Ok(prediction)
+        }
+        Ok(output) => {
+            let error_path = experiment_dir.join("error.json");
+            let error_text = fs::read_to_string(&error_path).ok();
+            let stderr = String::from_utf8_lossy(&output.stderr);
+
+            if let Some(err_text) = error_text {
+                if let Ok(err_json) = serde_json::from_str::<Value>(&err_text) {
+                    let message = err_json["message"]
+                        .as_str()
+                        .unwrap_or("prediction failed");
+                    return Err(message.to_string());
+                }
+            }
+
+            Err(format!("prediction failed: {}", stderr.trim()))
+        }
+        Err(e) => Err(format!("failed to launch worker for prediction: {e}")),
+    }
 }
 
 #[cfg(test)]
@@ -922,7 +1069,8 @@ mod tests {
     fn conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
         db::create_experiments_table(&conn).unwrap();
-        db::create_experiments_table(&conn).unwrap();
+        // Run migrations to add checkpoint_path column
+        db::add_column_if_missing_public(&conn, "experiments", "checkpoint_path", "TEXT").unwrap();
         conn
     }
 
@@ -1072,6 +1220,7 @@ mod tests {
             &path_string(&plan_path.with_file_name("model_card.md")),
             "stdout",
             "stderr",
+            None,
         )
         .unwrap();
 
@@ -1123,6 +1272,7 @@ mod tests {
                 "/tmp/card.md",
                 "",
                 "",
+                None,
             )
             .unwrap();
             recompute_best_for_goal(&conn, goal).unwrap();
@@ -1151,6 +1301,7 @@ mod tests {
             "/tmp/card.md",
             "",
             "",
+            None,
         )
         .unwrap();
         recompute_best_for_goal(&conn, "Predict readmission").unwrap();
@@ -1331,7 +1482,7 @@ mod tests {
         let mut stmt = conn
             .prepare(
                 "SELECT id, created_at_ms, updated_at_ms, status, goal_text, dataset_id,
-                        primary_metric, metric_value, baseline_metric, is_best
+                        primary_metric, metric_value, baseline_metric, is_best, checkpoint_path
                  FROM experiments
                  ORDER BY created_at_ms DESC",
             )
@@ -1349,6 +1500,7 @@ mod tests {
                     metric_value: row.get(7)?,
                     baseline_metric: row.get(8)?,
                     is_best: row.get::<_, i64>(9)? != 0,
+                    checkpoint_path: row.get(10)?,
                 })
             })
             .unwrap();

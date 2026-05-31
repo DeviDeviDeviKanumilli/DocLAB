@@ -1,3 +1,5 @@
+> Historical UI export only. The implemented app in `src/` is the current source of truth; this file contains early static mockups and may show retired affordances such as deploy buttons or placeholder links.
+
 <!-- DocLab: Settings -->
 <!DOCTYPE html>
 

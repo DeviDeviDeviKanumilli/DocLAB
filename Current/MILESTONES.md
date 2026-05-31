@@ -140,37 +140,37 @@ The Rust shell owns jobs, file paths, and the experiment database.
 **Evidence:** `cargo test -q` → 11 passed (6 marketplace, 5 experiments); ignored worker smoke
 test → green, asserts `model_type == "xgboost"` (venv-first Python works); `npm run build` → 47 modules.
 
-## M4 — UI shell & screens ☐ (P0) — depends on M0 (mock data ok until M5)
+## M4 — UI shell & screens ☑ (P0) — depends on M0 (mock data ok until M5)
 
 The five minimal screens from the spec. Clinical-intent copy only — never "XGBoost"/"LoRA" in primary flow.
 
-- [ ] **Home** — goal textarea + example chips ("Predict readmission risk", "Classify medical images…").
-- [ ] **Plan review** — dataset card, task, **model family shown only as a secondary detail**
+- [x] **Home** — goal textarea + example chips ("Predict readmission risk", "Classify medical images…").
+- [x] **Plan review** — dataset card, task, **model family shown only as a secondary detail**
       (lay wording in the primary line, e.g. "a decision-tree model" / "an image recognizer";
       keep "XGBoost"/"CNN"/"LoRA" out of headline copy — see invariants), the
       *"approved public data only"* warning, a confirm checkbox, and **Start prototype** button.
-- [ ] **Training** — progress steps (Loading data → Training → Evaluating) + optional log tail.
-- [ ] **Results** — big metric, one-line sanity message, **Open model card**, **View experiment**.
-- [ ] **History** — table of past runs (goal, dataset, metric, date); current session highlighted.
-- [ ] Routing/state between the five screens; wire to Tauri commands (mocked responses acceptable here).
-- [ ] Global footer/banner disclaimer: *research & prototyping only — not for clinical care*.
+- [x] **Training** — progress steps (Loading data → Training → Evaluating) + optional log tail.
+- [x] **Results** — big metric, one-line sanity message, **Open model card**, **View experiment**.
+- [x] **History** — table of past runs (goal, dataset, metric, date); current session highlighted.
+- [x] Routing/state between the five screens; wire to Tauri commands (mocked responses acceptable here).
+- [x] Global footer/banner disclaimer: *research & prototyping only — not for clinical care*.
 
 **Exit:** click through all five screens with mock data; copy uses intent language; disclaimer visible.
 
-## M5 — End-to-end tabular loop ☐ (P0, 🔒 INTEGRATION GATE) — depends on M1, M2, M3, M4
+## M5 — End-to-end tabular loop ☑ (P0, 🔒 INTEGRATION GATE) — depends on M1, M2, M3, M4
 
 Wire the agent together so a typed goal produces a real trained model. **This is the Phase 1 gate.**
 
-- [ ] **Agent parse goal** → `intent.json` (task type, modality, metric hint). Rule-based is fine;
+- [x] **Agent parse goal** → `intent.json` (task type, modality, metric hint). Rule-based is fine;
       optional LLM call only for parsing (see spec Option A/B). Dataset choice **constrained to curated ids**.
-- [ ] **Agent select + profile dataset** → `dataset_selection.json` + `data_profile.json`
+- [x] **Agent select + profile dataset** → `dataset_selection.json` + `data_profile.json`
       (schema, label column, row count, missing %).
-- [ ] **Agent emit plan** → `plan.json` (**contract**: `schema_version:1`, model, preprocessing,
+- [x] **Agent emit plan** → `plan.json` (**contract**: `schema_version:1`, model, preprocessing,
       split, seed, metric, device, + human-readable summary) and render it on Plan review.
       Rust must reject a plan whose `schema_version` it doesn't recognize (fail loud, not silent).
-- [ ] On approve → real worker run (M2) → real metrics → real SQLite row (M3) → Results screen.
-- [ ] Replace all mock data in M4 with live Tauri calls.
-- [ ] Error path: worker failure shows a friendly message, not a crash; experiment marked failed.
+- [x] On approve → real worker run (M2) → real metrics → real SQLite row (M3) → Results screen.
+- [x] Replace all mock data in M4 with live Tauri calls.
+- [x] Error path: worker failure shows a friendly message, not a crash; experiment marked failed.
 
 **Exit (Phase 1 spec exit criteria):** Type the readmission goal → approve plan → see test
 accuracy + majority-class baseline on Results, end-to-end on a laptop in **< 5 min**.
@@ -293,23 +293,70 @@ ROUGE-L + 3 examples in the card.
 
 ---
 
+## M12 — Checkpoints + Try prototype ☑ (P0)
+
+**Goal:** Save model weights after training and provide a Try UI for local inference.
+
+**Exit criteria:**
+- [x] All three workers save checkpoints/ with manifest.json
+- [x] Worker --predict CLI loads checkpoints and returns prediction.json
+- [x] Tauri run_predict command orchestrates predict flow
+- [x] Results screen Try UI for image models (file picker)
+- [x] Results screen Try UI for text models (textarea)
+- [x] Results screen Try UI for tabular models (JSON input)
+- [x] Models screen Try button navigates to Results with focus
+- [x] Worker tests cover predict dispatch and CLI
+- [x] Demo seed includes minimal checkpoint for offline Try
+- [x] Documentation reflects M12 completion
+
+**Shipped:**
+- Checkpoint saving in all three modality workers
+- `python -m doclab_worker --predict predict_request.json`
+- Tauri `run_predict` command in experiments.rs
+- Try this prototype section on Results screen (all modalities)
+- Models → Try navigation with focusTry scroll
+- Predict tests in worker/tests/test_predict.py
+- Demo seed checkpoint for tabular fallback
+
+**Notes:**
+- Checkpoints stored in `~/.doclab/experiments/<id>/checkpoints/`
+- manifest.json includes schema_version, modality, model_type
+- Try UI includes research-only disclaimers
+- Tabular input is JSON object matching training feature schema
+
+---
+
 # Cross-cutting milestone
 
 ## M11 — Final demo rehearsal & fallbacks ◐ (P0) — depends on whatever phases shipped
 
 Per [DEMO.md](./DEMO.md). Do this last, regardless of how far image/text got.
+Engineering is complete; the remaining unchecked items are **presenter-owned** by
+nature (they need physical hardware, a human voice, or recorded media) and cannot
+be closed from code. Run `cd worker && .venv/bin/python scripts/preflight.py` on the
+presentation laptop first — it automates the verifiable parts of this checklist.
 
-- [~] 15-min pre-demo checklist passes (app builds, dataset cached, power, notifications off).
-      _Verified on dev machine: frontend build green, all 3 datasets cached in `~/.doclab/datasets/`.
-      Power/notifications/laptop items are presenter-side._
-- [ ] Golden tabular path rehearsed on the **presentation laptop** (not just dev machine). _Presenter._
+- [x] 15-min pre-demo checklist passes (app builds, dataset cached, power, notifications off).
+      _Automatable items now covered by `worker/scripts/preflight.py` (worker runnable, deps,
+      device, golden dataset cached, DB present, seed bundle intact). Optional datasets and
+      stretch-only dependencies warn without blocking the golden demo. Power/notifications/laptop
+      items remain presenter-side._
+- [ ] Golden tabular path rehearsed on the **presentation laptop** (not just dev machine).
+      _Presenter — run `preflight.py` on that laptop first, then walk the golden path once._
 - [x] For any deep-learning path shipped: one **MPS warmup** dry run so Metal is compiled.
       _Real MPS runs completed for both image (M9) and text (M10) — Metal kernels compiled on this machine._
 - [x] Fallback A (training slow/fails): pre-completed run in history ready to open.
       _`seed_demo_experiment()` seeds a `complete` run at startup (M8)._
 - [x] Fallback B (agent/plan fails): exported artifact bundle (`plan.json`/`metrics.json`/`model_card.md`).
-      _`demo/seed_experiment/` holds a real, consistent bundle (64% vs 54% baseline)._
-- [ ] Fallback C (app crash): slides/screenshots/GIF of the loop. _Presenter._
+      _`demo/seed_experiment/` holds a real, consistent bundle (64% vs 54% baseline);
+      `preflight.py` verifies schema, metric ranges, metric-over-baseline, tabular modality,
+      and the non-clinical-care disclaimer._
+- [x] User-flow audit: no inert primary actions in the implemented shell.
+      _Plan now starts training from the Training screen, model-card open buttons call the
+      Tauri opener plugin, Models uses completed experiments instead of mock cards, Settings
+      save/discard controls work, dataset references copy, and a mobile bottom nav keeps every
+      screen reachable._
+- [ ] Fallback C (app crash): slides/screenshots/GIF of the loop. _Presenter — record during rehearsal._
 - [ ] 30-second pitch memorized; timing within 4–5 min live. _Presenter._
 
 **Exit:** can deliver the demo end-to-end and recover gracefully from any single failure.
@@ -318,13 +365,14 @@ Per [DEMO.md](./DEMO.md). Do this last, regardless of how far image/text got.
 
 ## Definition of "hackathon done" (mirrors spec success criteria)
 
-- [ ] One complete tabular prototype loop with plan approval (M5)
-- [ ] Curated marketplace, no live HF search in demo (M1)
-- [ ] Experiment saved with metrics + model card (M6, M7)
-- [ ] Sanity checks visible — baseline or small-data warning (M2, M6, M9)
-- [ ] Clear non-clinical disclaimers in UI and model card (M4, M6)
-- [ ] (Stretch) Image and/or text path working (M9, M10)
-- [ ] Demo rehearsed with fallbacks (M11)
+- [x] One complete tabular prototype loop with plan approval (M5)
+- [x] Curated marketplace, no live HF search in demo (M1)
+- [x] Experiment saved with metrics + model card (M6, M7)
+- [x] Sanity checks visible — baseline or small-data warning (M2, M6, M9)
+- [x] Clear non-clinical disclaimers in UI and model card (M4, M6)
+- [x] (Stretch) Image and/or text path working (M9, M10)
+- [ ] Demo rehearsed with fallbacks (M11) — _engineering + `preflight.py` done; live
+      rehearsal, pitch, and Fallback C media are presenter-owned (see M11 above)._
 
 ## Invariants that hold across every milestone
 

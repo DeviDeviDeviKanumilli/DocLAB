@@ -31,17 +31,17 @@ export function TopAppBar({
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="flex items-center gap-2 rounded border border-border bg-background px-4 py-1.5 font-headline-md text-headline-md text-text-primary transition-colors hover:bg-surface-muted">
-          <Icon name="rocket_launch" size={18} />
-          Deploy Model
-        </button>
+        <div className="flex items-center gap-2 rounded border border-border bg-background px-4 py-1.5 font-headline-md text-headline-md text-text-primary">
+          <Icon name="encrypted" size={18} />
+          Local only
+        </div>
         <div className="mx-1 h-6 w-px bg-border" />
-        <button className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-container hover:text-primary">
-          <Icon name="notifications" size={20} />
-        </button>
-        <button className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-surface-container hover:text-primary">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary">
+          <Icon name="notifications_off" size={20} />
+        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-full text-text-secondary">
           <Icon name="account_circle" size={20} />
-        </button>
+        </div>
       </div>
     </header>
   );
