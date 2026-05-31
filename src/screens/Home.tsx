@@ -68,10 +68,14 @@ export function Home() {
               className="h-[160px] w-full resize-none border-none bg-transparent p-4 font-body-md text-body-md text-text-primary placeholder:text-text-disabled focus:outline-none focus:ring-0"
             />
             <div className="flex items-center justify-between px-3 pb-2">
-              <div className="flex items-center gap-1.5 font-label-sm text-label-sm text-text-muted">
+              <button
+                type="button"
+                onClick={() => navigate("datasets")}
+                className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-label-sm text-label-sm text-text-secondary transition-all hover:border-border-strong hover:bg-surface-muted active:scale-[0.98]"
+              >
                 <Icon name="attach_file" size={16} />
                 Attach dataset
-              </div>
+              </button>
               <button
                 onClick={() => start(goal)}
                 disabled={!goal.trim()}
