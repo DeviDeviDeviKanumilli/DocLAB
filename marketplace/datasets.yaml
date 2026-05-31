@@ -1,4 +1,20 @@
 # DocLab curated dataset marketplace (source of truth).
-# Real tabular entries are added in M1. The agent may ONLY select dataset
-# ids present in this file — never live Hugging Face search at runtime.
-datasets: []
+# The agent may ONLY select dataset ids present in this file — never live
+# Hugging Face search at runtime. `revision` is a pinned commit SHA for
+# reproducibility (never a moving branch like `main`).
+datasets:
+  - id: diabetes_readmission
+    name: Diabetes 130-US Hospitals Readmission
+    hf_id: imodels/diabetes-readmission
+    revision: 191ab1f0aa68d52f6cd55d68df57849fad1751ca
+    description: Predict 30-day hospital readmission from diabetic encounter records.
+    category: readmission
+    data_type: tabular
+    task_types: [predict, classify]
+    modality: encounter records
+    license: UCI port (Diabetes 130-US Hospitals); no explicit HF license — research use
+    size: "~100k rows (train.csv + test.csv)"
+    label_column: readmitted
+    limitations: >-
+      Public UCI-derived research dataset; preprocessed/one-hot encoded by the
+      imodels team. Not representative of any single hospital; use carefully.

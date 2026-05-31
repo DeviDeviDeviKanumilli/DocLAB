@@ -1,4 +1,9 @@
+mod db;
+mod marketplace;
+
+use std::path::PathBuf;
 use std::process::Command;
+use marketplace::{Dataset, Marketplace};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -24,11 +29,51 @@ fn worker_healthcheck() -> Result<String, String> {
     }
 }
 
+/// Query the curated marketplace (M1). The agent may ONLY surface datasets
+/// returned from here — there is no live Hugging Face search.
+#[tauri::command]
+fn query_datasets(
+    state: tauri::State<Marketplace>,
+    keyword: Option<String>,
+    data_type: Option<String>,
+    task_type: Option<String>,
+) -> Vec<Dataset> {
+    state.query(keyword.as_deref(), data_type.as_deref(), task_type.as_deref())
+}
+
+fn marketplace_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("marketplace")
+        .join("datasets.yaml")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // YAML is the source of truth; a bad index is fatal at startup (fail loud).
+    let market = Marketplace::load(&marketplace_path())
+        .expect("failed to load curated dataset marketplace");
+
+    // SQLite is a mirror for M3+ joins, NOT the query hot path — a failure
+    // here is logged but must not block the in-memory marketplace.
+    match db::open_db() {
+        Ok(conn) => {
+            if let Err(e) = db::mirror_datasets(&conn, &market) {
+                eprintln!("warning: failed to mirror datasets to sqlite: {e}");
+            }
+        }
+        Err(e) => eprintln!("warning: failed to open doclab.db: {e}"),
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, worker_healthcheck])
+        .manage(market)
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            worker_healthcheck,
+            query_datasets
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

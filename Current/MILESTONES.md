@@ -74,17 +74,21 @@ Stand up the three runtimes so later milestones have somewhere to land.
 
 **Exit:** `npm run tauri dev` opens a window; `python -m doclab_worker --help` runs; Rust build green.
 
-## M1 — Dataset marketplace ☐ (P0) — depends on M0
+## M1 — Dataset marketplace ☑ (P0) — depends on M0
 
 The curated index the agent is allowed to choose from. **No live HF search ever.**
 
-- [ ] Define `datasets.yaml` schema (one entry per dataset) — **contract**:
+- [x] Define `datasets.yaml` schema (one entry per dataset) — **contract**:
       `id, name, hf_id, revision, description, category, data_type, task_types[], modality,
       license, size, label_column, limitations`.
-- [ ] Add **1–2 real tabular** datasets with binary label + pinned `revision` (replace spec placeholders).
-- [ ] Loader: parse YAML → validate required fields → expose query API (keyword + `data_type`/`task_type` filter).
-- [ ] Mirror index into SQLite `datasets` table on startup (idempotent upsert).
-- [ ] Unit test: query "readmission" returns the tabular dataset; unknown id returns nothing.
+- [x] Add **1–2 real tabular** datasets with binary label + pinned `revision` (replace spec placeholders).
+      _`imodels/diabetes-readmission` @ `191ab1f0…`, label `readmitted`._
+- [x] Loader: parse YAML → validate required fields → expose query API (keyword + `data_type`/`task_type` filter).
+      _`src-tauri/src/marketplace.rs`; fails loud on missing field or unpinned `main`._
+- [x] Mirror index into SQLite `datasets` table on startup (idempotent upsert).
+      _`src-tauri/src/db.rs`; `~/.doclab/doclab.db`, verified no dupes on re-run._
+- [x] Unit test: query "readmission" returns the tabular dataset; unknown id returns nothing.
+      _6 tests green via `cargo test`._
 
 **Exit:** a query call returns a ranked list of curated datasets; agent can only see these ids.
 
