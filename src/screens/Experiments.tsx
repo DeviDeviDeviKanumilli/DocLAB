@@ -12,6 +12,12 @@ const STATUS_TONE: Record<string, "success" | "running" | "error" | "neutral"> =
   failed: "error",
 };
 
+function formatMetric(exp: ExperimentSummary): string {
+  if (exp.metricValue === null) return "—";
+  if (exp.primaryMetric === "rouge_l") return exp.metricValue.toFixed(2);
+  return `${(exp.metricValue * 100).toFixed(1)}%`;
+}
+
 export function Experiments() {
   const { navigate } = useRouter();
   const [experiments, setExperiments] = useState<ExperimentSummary[]>([]);
@@ -109,7 +115,7 @@ export function Experiments() {
                       <td className="px-4 py-3 text-text-secondary">{exp.datasetId}</td>
                       <td className="px-4 py-3">
                         {exp.metricValue !== null ? (
-                          `${(exp.metricValue * 100).toFixed(1)}%`
+                          formatMetric(exp)
                         ) : (
                           <span className="text-text-muted">—</span>
                         )}

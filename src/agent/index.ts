@@ -23,16 +23,16 @@ export async function runAgent(goalText: string): Promise<AgentResult> {
   const selection = await selectDataset(intent);
   console.log("[Agent] dataset_selection.json:", selection);
 
-  // 3. Profile dataset (stub for Phase 1)
-  const profile = await profileDataset(selection.dataset_id);
-  console.log("[Agent] data_profile.json:", profile);
-
-  // 4. Create plan via Tauri create_plan command
+  // 3. Create plan via Tauri create_plan command
   const planPreview = await invoke<PlanPreview>("create_plan", {
     goalText,
     datasetId: selection.dataset_id,
   });
   console.log("[Agent] plan created:", planPreview);
+
+  // 4. Profile selected dataset metadata for the fixed artifact contract
+  const profile = await profileDataset(planPreview.dataset);
+  console.log("[Agent] data_profile.json:", profile);
 
   return { intent, selection, profile, planPreview };
 }

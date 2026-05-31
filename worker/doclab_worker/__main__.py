@@ -4,8 +4,9 @@ Usage:
     python -m doclab_worker --help
     python -m doclab_worker --job <path/to/plan.json>
 
-Reads a plan.json, runs the tabular pipeline, and writes `metrics.json`
-beside the plan on success — or `error.json` + non-zero exit on failure.
+Reads a plan.json, dispatches to the modality engine it declares
+(tabular / image / text), and writes `metrics.json` beside the plan on
+success — or `error.json` + non-zero exit on failure.
 """
 
 import argparse
@@ -39,8 +40,9 @@ def data_root() -> Path:
 def run_job(plan_path: Path) -> dict:
     """Dispatch to the right training engine based on the plan's modality.
 
-    Tabular is the default; image plans route to the PyTorch CNN path. Both
-    return a metrics dict; image runs may add `device_fallback` and `warning`.
+    Tabular is the default for older Phase 1 plans. Image and text plans route
+    to their modality-specific engines when the plan carries `modality` or
+    `data_type`.
     """
     plan = tabular.load_plan(plan_path)
     modality = (plan.get("modality") or plan.get("data_type") or "tabular").lower()
@@ -54,6 +56,11 @@ def run_job(plan_path: Path) -> dict:
         from . import text
 
         return text.run_job(plan, data_root())
+
+    if modality != "tabular":
+        raise WorkerError(
+            "bad_plan", "load", f"unsupported modality/data_type: {modality!r}"
+        )
 
     df = tabular.load_data(plan, data_root())
     X, y = tabular.preprocess(df, plan.get("label_column", ""))

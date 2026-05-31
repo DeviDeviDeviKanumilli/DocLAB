@@ -28,9 +28,12 @@ Live demo script: **[DEMO.md](./Current/DEMO.md)**
 
 ## Status
 
-Hackathon MVP in progress. **Phase 1 (tabular)** is the primary target; image and text paths are stretch goals.
+Hackathon MVP, feature-complete. All three modality paths work end-to-end: **tabular** (XGBoost),
+**image** (PyTorch CNN), and **text** (Transformers + LoRA). Milestones M0–M10 are done; M11
+(demo rehearsal) is the only remaining work and is presenter-side, not code.
 
-See [spec.md](./Current/spec.md) for phased exit criteria and scope.
+See [MILESTONES.md](./Current/MILESTONES.md) for per-milestone status and [spec.md](./Current/spec.md)
+for scope.
 
 ---
 
@@ -46,21 +49,29 @@ See [spec.md](./Current/spec.md) for phased exit criteria and scope.
 
 ---
 
-## Project layout (target)
+## Project layout
 
 ```
 DocLAB/
 ├── README.md
 ├── CLAUDE.md               # Guidance for Claude Code instances
+├── AGENTS.md               # Guidance for AI coding agents
 ├── Current/
 │   ├── spec.md             # Vision, architecture, hackathon scope (source of truth)
-│   └── DEMO.md             # Judge demo script
+│   ├── MILESTONES.md       # Per-milestone status + exit criteria
+│   ├── M0_PLAN.md … M11_PLAN.md  # Per-milestone implementation notes
+│   ├── TESTING.md          # How to write tests in this repo
+│   ├── DEMO.md             # Judge demo script
+│   ├── UI.md               # UI design reference
+│   └── handoff.md          # Current handoff / next-step summary
 ├── Archived_Plans/         # Superseded earlier spec/demo/handoff
 ├── marketplace/
 │   └── datasets.yaml       # Curated dataset index (source of truth)
-├── src/                    # Tauri + React app (TBD)
-├── worker/                 # Python training worker (TBD)
-└── doclab/                 # Runtime data (created on first run)
+├── src/                    # Tauri + React app
+├── src-tauri/              # Rust shell (orchestration, SQLite, Tauri commands)
+├── worker/                 # Python training worker (tabular / image / text)
+├── demo/seed_experiment/   # Committed fallback artifact bundle
+└── ~/.doclab/              # Runtime data (created on first run)
     ├── doclab.db
     ├── datasets/
     └── experiments/
@@ -69,8 +80,6 @@ DocLAB/
 ---
 
 ## Quick start
-
-> Setup commands will be added when the app scaffold lands. Expected flow:
 
 ### Prerequisites
 
@@ -81,26 +90,31 @@ DocLAB/
 - **Apple Silicon:** PyTorch **MPS** for image/text training (recommended on MacBook demo)
 - **Intel Mac / no GPU:** CPU for all modalities
 - NVIDIA CUDA not used (Mac has no CUDA)
+- **macOS + XGBoost:** `brew install libomp` (else the tabular path falls back to LogisticRegression)
 
-### Run (placeholder)
+### Run
 
 ```bash
 # Clone the repo
 git clone <repo-url>
 cd DocLAB
 
-# Frontend + Tauri (once scaffold exists)
-npm install
-npm run tauri dev
-
-# Python worker (once worker/ exists)
+# Python worker (set up first so the Rust shell can find the venv)
 cd worker
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cd ..
+
+# Frontend + Tauri (full app)
+npm install
+npm run tauri dev
 ```
 
-Data and experiments are stored under `./doclab/` or `~/.doclab/` (see [spec.md](./Current/spec.md)).
+Optional, for an offline demo: `python worker/scripts/prefetch.py` pre-caches the curated datasets.
+
+Data and experiments are stored under `~/.doclab/` (`doclab.db`, `datasets/<id>/`,
+`experiments/<id>/`), created on first run. See [spec.md](./Current/spec.md) for details.
 
 ---
 

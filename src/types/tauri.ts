@@ -27,11 +27,13 @@ export interface WorkerPlan {
   model_type: string;
   framework: string;
   device: string;
+  modality: "tabular" | "image" | "text";
   seed: number;
   split: number[];
   primary_metric: string;
   goal_text?: string;
   summary?: string;
+  text_column?: string;
   local_csv?: string;
 }
 

@@ -4,35 +4,50 @@ Guidance for AI coding agents working in this repository.
 
 ## Project State
 
-DocLab is a **hackathon MVP in the spec stage**. The repo currently contains docs only and
-**no code scaffold yet**. The planned `src/` Tauri + React app, `worker/` Python package, and
-`marketplace/datasets.yaml` still need to be created.
+DocLab is a **hackathon MVP with all milestones (M0–M11) shipped**. The full stack is built —
+`src/` (Tauri + React), `worker/` (Python `doclab_worker`), `src-tauri/` (Rust), and
+`marketplace/datasets.yaml`. All three modality paths (tabular, image, text) work end-to-end.
+M11 is partially complete: machine-verifiable demo-readiness items are done; presenter-side
+rehearsal items are open.
 
 Docs are split into current vs. archived:
 
-- `Current/spec.md` - full spec, read this first; it is the source of truth.
-- `Current/DEMO.md` - judge demo script and demo fallbacks.
+- `Current/spec.md` - full spec (original source of truth for product scope).
+- `Current/MILESTONES.md` - what each milestone delivered + exit criteria; authoritative record
+  of shipped scope.
+- `Current/M0_PLAN.md` … `Current/M11_PLAN.md` - per-milestone implementation notes.
+- `Current/TESTING.md` - how to write tests in this repo; read before adding any test.
+- `Current/DEMO.md` - judge demo script and fallback ladder.
 - `Archived_Plans/` - superseded earlier versions; do not build from these.
-- `README.md` - product overview, stack, and target layout.
+- `README.md` - product overview, stack, and layout.
 - `handoff.md` - current handoff and next-step summary.
 
-When scaffolding, follow the target layout and contracts below rather than inventing new ones.
+Follow the established layout and contracts below; do not invent new ones.
 
 ## Commands
 
-No build, lint, or test tooling exists yet. Expected commands once scaffolded:
-
 ```bash
-npm install && npm run tauri dev
+# Frontend (Tauri + React)
+npm install
+npm run tauri dev          # run the desktop app
+npm run build              # tsc strict + vite — the frontend gate (no JS test runner yet)
 
+# Python worker
 cd worker
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m doclab_worker --job plan.json
+python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+python -m doclab_worker --job plan.json   # invoke the worker (Rust calls this)
+python -m pytest -q                         # worker tests (offline, fast)
+
+# Rust orchestration
+cd src-tauri && cargo test -q               # fast suite (skips #[ignore])
+cd src-tauri && cargo test -- --ignored     # live worker smoke test
+
+# Demo setup
+python worker/scripts/prefetch.py           # pre-cache datasets for an offline demo
 ```
 
-Add real commands to this file as the scaffold lands.
+macOS: XGBoost needs `brew install libomp`. The Rust side resolves Python venv-first
+(`DOCLAB_PYTHON` → `worker/.venv/bin/python` → `python3`).
 
 ## Product Architecture
 

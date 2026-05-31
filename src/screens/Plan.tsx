@@ -4,7 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
 import { runAgent, type AgentResult } from "../agent";
-import type { ExperimentDetail } from "../types/tauri";
+import type { ExperimentDetail, WorkerPlan } from "../types/tauri";
 
 const STEPS = [
   { label: "Goal", icon: "check_circle", state: "done" },
@@ -12,6 +12,24 @@ const STEPS = [
   { label: "Training", icon: "data_exploration", state: "todo" },
   { label: "Evaluation", icon: "analytics", state: "todo" },
 ] as const;
+
+function approachLabel(plan: WorkerPlan): string {
+  if (plan.modality === "image") return "Medical image classifier";
+  if (plan.modality === "text") return "Medical text summarizer";
+  return "Structured-data predictor";
+}
+
+function metricLabel(metric: string): string {
+  if (metric === "rouge_l") return "ROUGE-L similarity";
+  return metric.replace(/_/g, " ");
+}
+
+function metricHelp(plan: WorkerPlan): string {
+  if (plan.primary_metric === "rouge_l") {
+    return "Compared with reference summaries and fixed qualitative examples.";
+  }
+  return "Compared against a majority-class baseline.";
+}
 
 export function Plan() {
   const { params, navigate } = useRouter();
@@ -97,7 +115,7 @@ export function Plan() {
   const logLines = [
     { tag: "OK", text: `Parsed intent: "${intent.task_type}" task, ${intent.modality} modality` },
     { tag: "OK", text: `Queried curated dataset registry: ${selection.dataset_name}` },
-    { tag: "OK", text: `Selected model: ${plan.model_type} (${plan.framework})` },
+    { tag: "OK", text: `Selected training approach: ${approachLabel(plan)}` },
     { tag: ">", text: "Plan finalized — awaiting your confirmation..." },
   ];
 
@@ -208,13 +226,13 @@ export function Plan() {
             <div className="col-span-1 grid grid-cols-1 gap-6 rounded border border-border bg-background p-4 md:col-span-2 md:grid-cols-3">
               <div className="border-border pr-4 md:border-r">
                 <h4 className="mb-2 font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
-                  Model family
+                  Training approach
                 </h4>
                 <p className="mb-2 font-headline-md text-headline-md text-primary">
-                  {plan.model_type === "xgboost" ? "Gradient-boosted decision trees" : plan.model_type}
+                  {approachLabel(plan)}
                 </p>
                 <span className="inline-block rounded border border-border-strong bg-surface-muted px-2 py-0.5 font-code-sm text-code-sm text-text-secondary">
-                  {plan.framework} · {plan.device}
+                  Runs locally · {plan.device.toUpperCase()}
                 </span>
               </div>
               <div className="border-border pr-4 md:border-r">
@@ -222,10 +240,10 @@ export function Plan() {
                   Target metric
                 </h4>
                 <p className="font-headline-md text-headline-md text-primary capitalize">
-                  {plan.primary_metric}
+                  {metricLabel(plan.primary_metric)}
                 </p>
                 <p className="mt-1 font-label-sm text-text-muted">
-                  Compared against a majority-class baseline.
+                  {metricHelp(plan)}
                 </p>
               </div>
               <div>

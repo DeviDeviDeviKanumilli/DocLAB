@@ -10,6 +10,15 @@ import { friendlyError } from "../lib/errors";
 import { useCountUp } from "../hooks/useCountUp";
 import type { ExperimentDetail } from "../types/tauri";
 
+function modelFamilyLabel(modelType?: string | null): string {
+  if (modelType === "cnn") return "Medical image classifier";
+  if (modelType === "lora_t5_small") return "Medical text summarizer";
+  if (modelType === "xgboost" || modelType === "logistic_regression") {
+    return "Structured-data predictor";
+  }
+  return modelType || "Unknown";
+}
+
 /** Animated metric value: counts up from 0 on mount. */
 function CountValue({
   target,
@@ -82,11 +91,16 @@ export function Results() {
     );
   }
 
-  const sanityPassed = (detail.metricValue || 0) > (detail.baselineMetric || 0);
-  const metricPercent = ((detail.metricValue || 0) * 100).toFixed(1);
-  const baselinePercent = ((detail.baselineMetric || 0) * 100).toFixed(1);
-  const delta = ((detail.metricValue || 0) - (detail.baselineMetric || 0)) * 100;
+  const metricValue = detail.metricValue || 0;
+  const baselineValue = detail.baselineMetric || 0;
+  const isSimilarityMetric = detail.primaryMetric === "rouge_l";
+  const sanityPassed = metricValue > baselineValue;
+  const metricPercent = (metricValue * 100).toFixed(1);
+  const baselinePercent = (baselineValue * 100).toFixed(1);
+  const delta = (metricValue - baselineValue) * 100;
   const deltaStr = delta > 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
+  const metricLabel = isSimilarityMetric ? "ROUGE-L" : "Accuracy";
+  const metricTarget = isSimilarityMetric ? metricValue : Number(metricPercent);
 
   return (
     <AppShell title="Results">
@@ -133,16 +147,23 @@ export function Results() {
                   Model family
                 </div>
                 <div className="text-headline-md text-text-primary font-headline-md">
-                  {detail.modelType === "xgboost" ? "Gradient-boosted trees" : detail.modelType || "Unknown"}
+                  {modelFamilyLabel(detail.modelType)}
                 </div>
               </div>
               <div className="flex flex-col gap-0.5" style={{ "--i": 2 } as CSSProperties}>
                 <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
-                  Accuracy
+                  {metricLabel}
                 </div>
                 <div className="flex items-baseline gap-2 text-headline-md text-text-primary font-headline-md">
-                  <CountValue target={Number(metricPercent)} decimals={1} suffix="%" delay={250} />
-                  <span className="font-label-sm text-success-text">{deltaStr} vs baseline</span>
+                  <CountValue
+                    target={metricTarget}
+                    decimals={isSimilarityMetric ? 2 : 1}
+                    suffix={isSimilarityMetric ? "" : "%"}
+                    delay={250}
+                  />
+                  {!isSimilarityMetric && (
+                    <span className="font-label-sm text-success-text">{deltaStr} vs baseline</span>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-0.5" style={{ "--i": 3 } as CSSProperties}>
@@ -171,13 +192,17 @@ export function Results() {
 
             {/* Sanity message */}
             <div className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-3 ${
-              sanityPassed
-                ? "border-success-text/20 bg-success-bg text-success-text"
-                : "border-warning-text/20 bg-warning-bg text-warning-text"
+              isSimilarityMetric
+                ? "border-border bg-surface text-text-secondary"
+                : sanityPassed
+                  ? "border-success-text/20 bg-success-bg text-success-text"
+                  : "border-warning-text/20 bg-warning-bg text-warning-text"
             }`}>
-              <Icon name={sanityPassed ? "verified" : "warning"} size={18} />
+              <Icon name={isSimilarityMetric ? "summarize" : sanityPassed ? "verified" : "warning"} size={18} />
               <p className="font-body-md text-sm">
-                {sanityPassed
+                {isSimilarityMetric
+                  ? `ROUGE-L is a reference-summary similarity score (${metricValue.toFixed(2)} on a 0–1 scale). Review the fixed examples in the model card qualitatively.`
+                  : sanityPassed
                   ? `Sanity check passed — the model scores above the majority-class baseline (${metricPercent}% vs. ${baselinePercent}%), so it is learning real signal.`
                   : `Warning: model performance (${metricPercent}%) is close to or below the baseline (${baselinePercent}%). The model may not be learning signal.`
                 }

@@ -4,28 +4,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-DocLab is a **hackathon MVP in the spec stage**. The repo currently contains only docs and
-**no code scaffold yet** — `src/` (Tauri + React) and `worker/` (Python) are TBD.
+DocLab is a **hackathon MVP with all milestones (M0–M11) shipped**. The full stack is built:
+`src/` (Tauri + React), `worker/` (Python), `src-tauri/` (Rust), and `marketplace/datasets.yaml`.
+All three modality paths work end-to-end (tabular, image, text). M11 is partially done — the
+machine-verifiable demo-readiness items are complete; the presenter-side rehearsal items are open.
 
 Docs are split into current vs. archived:
-- `Current/spec.md` — full spec, read this first (source of truth)
-- `Current/DEMO.md` — judge demo script
+- `Current/spec.md` — full spec (original source of truth)
+- `Current/MILESTONES.md` — what each milestone delivered, with exit criteria; the authoritative
+  record of shipped scope
+- `Current/M0_PLAN.md` … `Current/M11_PLAN.md` — per-milestone implementation notes
+- `Current/TESTING.md` — how to write tests in this repo (read before adding tests)
+- `Current/DEMO.md` — judge demo script + fallback ladder
 - `Archived_Plans/` — superseded earlier versions of the spec/demo/handoff; do not build from these
 - `README.md` — product overview
 
-When scaffolding, follow the target layout and contracts below rather than inventing new ones.
-
 ## Commands
 
-No build/lint/test tooling exists yet. The expected commands once scaffolded (from README):
-
 ```bash
-npm install && npm run tauri dev    # Tauri + React app
+# Frontend (Tauri + React)
+npm install
+npm run tauri dev          # run the desktop app
+npm run build              # tsc strict + vite — the frontend gate (no JS test runner yet)
+
+# Python worker
 cd worker && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-python -m doclab_worker --job plan.json   # invoke the training worker (Rust calls this)
+python -m doclab_worker --job plan.json    # invoke the worker (Rust calls this)
+python -m pytest -q                         # worker tests (offline, fast)
+
+# Rust orchestration
+cd src-tauri && cargo test -q               # fast suite (skips #[ignore])
+cd src-tauri && cargo test -- --ignored     # live worker smoke test
+
+# Demo setup
+python worker/scripts/prefetch.py           # pre-cache datasets for an offline demo
 ```
 
-Add real commands to this file as the scaffold lands.
+macOS note: XGBoost needs `brew install libomp`. The worker resolves Python venv-first
+(`DOCLAB_PYTHON` → `worker/.venv/bin/python` → `python3`).
 
 ## Architecture
 

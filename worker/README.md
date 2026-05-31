@@ -7,7 +7,8 @@ python -m doclab_worker --job <path/to/plan.json>
 ```
 
 JSON in (`plan.json`) → JSON out (`metrics.json`), or `error.json` + non-zero exit on failure.
-The tabular training engine landed in M2.
+All three modality paths are implemented: tabular (XGBoost, M2), image (PyTorch CNN, M9), and
+text (Transformers + LoRA, M10). The worker dispatches on `plan.modality`.
 
 ## Setup
 

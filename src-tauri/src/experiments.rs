@@ -12,6 +12,10 @@ use uuid::Uuid;
 const SCHEMA_VERSION: u8 = 1;
 const DEFAULT_DATASET_ID: &str = "diabetes_readmission";
 
+fn default_modality() -> String {
+    "tabular".to_string()
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct AgentArtifacts {
     pub intent: String,
@@ -29,11 +33,15 @@ pub struct WorkerPlan {
     pub model_type: String,
     pub framework: String,
     pub device: String,
+    #[serde(default = "default_modality")]
+    pub modality: String,
     pub seed: u64,
     pub split: Vec<f64>,
     pub primary_metric: String,
     pub goal_text: Option<String>,
     pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_csv: Option<String>,
 }
@@ -135,10 +143,20 @@ pub fn create_plan(
         .ok_or_else(|| format!("dataset id '{wanted_id}' is not in the curated marketplace"))?;
 
     let data_type = dataset.data_type.to_lowercase();
-    let (model_type, framework, summary): (&str, &str, String) = match data_type.as_str() {
+    let (model_type, framework, primary_metric, device, text_column, summary): (
+        &str,
+        &str,
+        &str,
+        &str,
+        Option<String>,
+        String,
+    ) = match data_type.as_str() {
         "tabular" => (
             "xgboost",
             "xgboost",
+            "accuracy",
+            "cpu",
+            None,
             format!(
                 "Train a decision-tree tabular prototype on {} and report accuracy against a majority-class baseline.",
                 dataset.name
@@ -147,22 +165,32 @@ pub fn create_plan(
         "image" => (
             "cnn",
             "pytorch",
+            "accuracy",
+            "mps",
+            None,
             format!(
                 "Train a small convolutional network on {} (subsampled for time) and report accuracy against a majority-class baseline.",
                 dataset.name
             ),
         ),
+        "text" => (
+            "lora_t5_small",
+            "transformers",
+            "rouge_l",
+            "mps",
+            Some("Text".to_string()),
+            format!(
+                "Build a local summarization prototype on {} and report ROUGE-L with fixed example summaries.",
+                dataset.name
+            ),
+        ),
         other => {
             return Err(format!(
-                "dataset '{}' is {}, which is not yet supported (tabular and image only)",
+                "dataset '{}' is {}, which is not supported (tabular, image, and text only)",
                 dataset.id, other
             ));
         }
     };
-
-    // Image runs use the Mac GPU when available; the worker resolves the real
-    // device at runtime and may fall back to CPU. Tabular stays CPU.
-    let device = if data_type == "image" { "mps" } else { "cpu" };
 
     let plan = WorkerPlan {
         schema_version: SCHEMA_VERSION,
@@ -173,11 +201,13 @@ pub fn create_plan(
         model_type: model_type.to_string(),
         framework: framework.to_string(),
         device: device.to_string(),
+        modality: data_type.clone(),
         seed: 42,
         split: vec![0.8, 0.1, 0.1],
-        primary_metric: "accuracy".to_string(),
+        primary_metric: primary_metric.to_string(),
         goal_text: Some(goal_text.clone()),
         summary: Some(summary.clone()),
+        text_column,
         local_csv: None,
     };
 
@@ -204,8 +234,9 @@ fn sanitize_model_name(goal: &str) -> String {
 }
 
 fn infer_task_type(plan: &WorkerPlan) -> &'static str {
-    match plan.model_type.as_str() {
-        "cnn" => "Image classification",
+    match plan.modality.as_str() {
+        "image" => "Image classification",
+        "text" => "Text summarization",
         _ => "Binary classification",
     }
 }
@@ -215,6 +246,7 @@ fn model_display_name(model_type: &str) -> String {
         "xgboost" => "Gradient-boosted decision trees (XGBoost)".to_string(),
         "logistic_regression" => "Logistic regression".to_string(),
         "cnn" => "Small convolutional neural network (PyTorch)".to_string(),
+        "lora_t5_small" => "Small text summarization model".to_string(),
         other => other.to_string(),
     }
 }
@@ -246,7 +278,7 @@ fn generate_model_card(
     };
 
     let sanity_note = if !is_similarity && metrics.metric_value <= metrics.baseline_metric + 0.02 {
-        "\n\n> **Sanity check:** the result is at or near the majority-class baseline. The model may not be learning meaningful signal from this data."
+        "\n\n> **Sanity check:** the result is at or near the majority-class baseline. Model may not be learning signal."
     } else {
         ""
     };
@@ -265,9 +297,8 @@ fn generate_model_card(
         }
     }
     if metrics.device_fallback {
-        extra_notes.push_str(
-            "\n\n> **Note:** GPU (MPS) training failed and the run fell back to CPU.",
-        );
+        extra_notes
+            .push_str("\n\n> **Note:** GPU (MPS) training failed and the run fell back to CPU.");
     }
 
     // Summarization: qualitative input->prediction->reference examples.
@@ -298,7 +329,7 @@ fn generate_model_card(
     let card = format!(
         "# {model_name}\n\n\
 **Goal:** {goal_text}\n\
-**Intended use:** Research and prototyping only — not for clinical decisions.\n\n\
+**Intended use:** Research and prototyping only — not for clinical care.\n\n\
 ## Summary\n\
 - **Dataset:** {dataset_name} (public / de-identified)\n\
 - **Task:** {task}\n\
@@ -319,7 +350,7 @@ fn generate_model_card(
 - **Framework:** {framework}\n\
 - **Hyperparameters:** see `plan.json` in this experiment directory.\n\n\
 ---\n\n\
-*Auto-generated by DocLab. For research and prototyping use only.*\n",
+*Auto-generated by DocLab. Research and prototyping only — not for clinical care.*\n",
         model_name = model_name,
         goal_text = goal_text,
         dataset_name = dataset.name,
@@ -338,8 +369,7 @@ fn generate_model_card(
         framework = metrics.framework,
     );
 
-    fs::write(&model_card_path, card)
-        .map_err(|e| format!("cannot write model_card.md: {e}"))?;
+    fs::write(&model_card_path, card).map_err(|e| format!("cannot write model_card.md: {e}"))?;
     Ok(path_string(&model_card_path))
 }
 
@@ -362,6 +392,7 @@ pub fn run_experiment(
             )
         })?
         .clone();
+    validate_plan_matches_dataset(&plan, &dataset)?;
 
     let conn = db::open_db()?;
     let id = generate_experiment_id();
@@ -515,6 +546,10 @@ fn validate_plan(plan: &WorkerPlan) -> Result<(), String> {
             plan.schema_version
         ));
     }
+    let modality = plan.modality.trim().to_lowercase();
+    if !matches!(modality.as_str(), "tabular" | "image" | "text") {
+        return Err(format!("unsupported plan modality: {}", plan.modality));
+    }
     if plan.dataset_id.trim().is_empty() {
         return Err("plan missing dataset_id".to_string());
     }
@@ -526,6 +561,44 @@ fn validate_plan(plan: &WorkerPlan) -> Result<(), String> {
     }
     if plan.split.len() != 3 {
         return Err("plan split must have exactly three ratios".to_string());
+    }
+    if plan.split.iter().any(|r| !r.is_finite() || *r <= 0.0) {
+        return Err("plan split ratios must be positive finite numbers".to_string());
+    }
+    let split_sum: f64 = plan.split.iter().sum();
+    if (split_sum - 1.0).abs() > 0.001 {
+        return Err("plan split ratios must sum to 1.0".to_string());
+    }
+    if modality == "text" && plan.text_column.as_deref().unwrap_or("").trim().is_empty() {
+        return Err("text plan missing text_column".to_string());
+    }
+    Ok(())
+}
+
+fn validate_plan_matches_dataset(plan: &WorkerPlan, dataset: &Dataset) -> Result<(), String> {
+    if !plan.modality.eq_ignore_ascii_case(&dataset.data_type) {
+        return Err(format!(
+            "plan modality '{}' does not match curated dataset '{}' type '{}'",
+            plan.modality, dataset.id, dataset.data_type
+        ));
+    }
+    if plan.hf_id != dataset.hf_id {
+        return Err(format!(
+            "plan hf_id '{}' does not match curated dataset '{}' hf_id '{}'",
+            plan.hf_id, dataset.id, dataset.hf_id
+        ));
+    }
+    if plan.revision != dataset.revision {
+        return Err(format!(
+            "plan revision '{}' does not match curated dataset '{}' revision '{}'",
+            plan.revision, dataset.id, dataset.revision
+        ));
+    }
+    if plan.label_column != dataset.label_column {
+        return Err(format!(
+            "plan label_column '{}' does not match curated dataset '{}' label_column '{}'",
+            plan.label_column, dataset.id, dataset.label_column
+        ));
     }
     Ok(())
 }
@@ -753,10 +826,7 @@ fn path_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-fn write_agent_artifacts(
-    experiment_dir: &Path,
-    artifacts: &AgentArtifacts,
-) -> Result<(), String> {
+fn write_agent_artifacts(experiment_dir: &Path, artifacts: &AgentArtifacts) -> Result<(), String> {
     fs::write(experiment_dir.join("intent.json"), &artifacts.intent)
         .map_err(|e| format!("cannot write intent.json: {e}"))?;
     fs::write(
@@ -798,7 +868,10 @@ pub fn seed_demo_experiment() -> Result<(), String> {
     let metrics_src = bundle.join("metrics.json");
     let card_src = bundle.join("model_card.md");
     if !plan_src.exists() || !metrics_src.exists() || !card_src.exists() {
-        return Err(format!("demo seed bundle incomplete at {}", bundle.display()));
+        return Err(format!(
+            "demo seed bundle incomplete at {}",
+            bundle.display()
+        ));
     }
 
     let dir = db::experiments_dir()?.join(DEMO_SEED_ID);
@@ -853,10 +926,57 @@ mod tests {
         conn
     }
 
-    fn temp_file(name: &str) -> PathBuf {
+    fn temp_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!("doclab_m3_{}", generate_experiment_id()));
         fs::create_dir_all(&dir).unwrap();
-        dir.join(name)
+        dir
+    }
+
+    fn temp_file(name: &str) -> PathBuf {
+        temp_dir().join(name)
+    }
+
+    fn dataset(id: &str, data_type: &str, label_column: &str) -> Dataset {
+        Dataset {
+            id: id.to_string(),
+            name: format!("{data_type} dataset"),
+            hf_id: format!("example/{id}"),
+            revision: "abc1234".to_string(),
+            description: format!("A {data_type} dataset for tests."),
+            category: "test".to_string(),
+            data_type: data_type.to_string(),
+            task_types: match data_type {
+                "text" => vec!["summarize".to_string()],
+                "image" => vec!["classify".to_string()],
+                _ => vec!["predict".to_string(), "classify".to_string()],
+            },
+            modality: data_type.to_string(),
+            license: "test".to_string(),
+            size: "small".to_string(),
+            label_column: label_column.to_string(),
+            limitations: "Dataset limitation for test.".to_string(),
+        }
+    }
+
+    fn worker_plan() -> WorkerPlan {
+        WorkerPlan {
+            schema_version: 1,
+            dataset_id: "diabetes_readmission".to_string(),
+            hf_id: "imodels/diabetes-readmission".to_string(),
+            revision: "191ab1f0aa68d52f6cd55d68df57849fad1751ca".to_string(),
+            label_column: "readmitted".to_string(),
+            model_type: "xgboost".to_string(),
+            framework: "xgboost".to_string(),
+            device: "cpu".to_string(),
+            modality: "tabular".to_string(),
+            seed: 42,
+            split: vec![0.8, 0.1, 0.1],
+            primary_metric: "accuracy".to_string(),
+            goal_text: Some("Predict readmission".to_string()),
+            summary: Some("Test plan".to_string()),
+            text_column: None,
+            local_csv: None,
+        }
     }
 
     #[test]
@@ -865,6 +985,48 @@ mod tests {
         for _ in 0..100 {
             assert!(ids.insert(generate_experiment_id()));
         }
+    }
+
+    #[test]
+    fn create_plan_includes_worker_modality_for_image() {
+        let market = Marketplace {
+            datasets: vec![dataset("test_images", "image", "label")],
+        };
+
+        let preview = create_plan(
+            &market,
+            "Classify chest X-ray images".to_string(),
+            Some("test_images".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(preview.plan.modality, "image");
+        assert_eq!(preview.plan.model_type, "cnn");
+        assert_eq!(preview.plan.framework, "pytorch");
+        assert_eq!(preview.plan.device, "mps");
+        assert_eq!(preview.plan.primary_metric, "accuracy");
+        assert!(preview.plan.text_column.is_none());
+    }
+
+    #[test]
+    fn create_plan_supports_text_summarization() {
+        let market = Marketplace {
+            datasets: vec![dataset("test_text", "text", "Summary")],
+        };
+
+        let preview = create_plan(
+            &market,
+            "Summarize medical education text".to_string(),
+            Some("test_text".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(preview.plan.modality, "text");
+        assert_eq!(preview.plan.model_type, "lora_t5_small");
+        assert_eq!(preview.plan.framework, "transformers");
+        assert_eq!(preview.plan.device, "mps");
+        assert_eq!(preview.plan.primary_metric, "rouge_l");
+        assert_eq!(preview.plan.text_column.as_deref(), Some("Text"));
     }
 
     #[test]
@@ -953,8 +1115,16 @@ mod tests {
             ("exp_c", "Classify x-rays", 0.91),
         ] {
             insert_running(&conn, id, 1, goal, "ds", "/tmp/plan.json").unwrap();
-            update_complete(&conn, id, &metrics(value), "/tmp/metrics.json", "/tmp/card.md", "", "")
-                .unwrap();
+            update_complete(
+                &conn,
+                id,
+                &metrics(value),
+                "/tmp/metrics.json",
+                "/tmp/card.md",
+                "",
+                "",
+            )
+            .unwrap();
             recompute_best_for_goal(&conn, goal).unwrap();
         }
 
@@ -964,12 +1134,89 @@ mod tests {
         assert!(get_experiment_by_id(&conn, "exp_c").unwrap().is_best);
 
         // A later, better run for the first goal flips the flag.
-        insert_running(&conn, "exp_d", 2, "Predict readmission", "ds", "/tmp/plan.json").unwrap();
-        update_complete(&conn, "exp_d", &metrics(0.88), "/tmp/metrics.json", "/tmp/card.md", "", "")
-            .unwrap();
+        insert_running(
+            &conn,
+            "exp_d",
+            2,
+            "Predict readmission",
+            "ds",
+            "/tmp/plan.json",
+        )
+        .unwrap();
+        update_complete(
+            &conn,
+            "exp_d",
+            &metrics(0.88),
+            "/tmp/metrics.json",
+            "/tmp/card.md",
+            "",
+            "",
+        )
+        .unwrap();
         recompute_best_for_goal(&conn, "Predict readmission").unwrap();
         assert!(!get_experiment_by_id(&conn, "exp_b").unwrap().is_best);
         assert!(get_experiment_by_id(&conn, "exp_d").unwrap().is_best);
+    }
+
+    #[test]
+    fn validate_plan_rejects_bad_split_and_unknown_modality() {
+        let mut bad_split = worker_plan();
+        bad_split.split = vec![0.9, 0.1, 0.1];
+        let err = validate_plan(&bad_split).unwrap_err();
+        assert!(err.contains("sum to 1.0"), "got: {err}");
+
+        let mut bad_modality = worker_plan();
+        bad_modality.modality = "audio".to_string();
+        let err = validate_plan(&bad_modality).unwrap_err();
+        assert!(err.contains("modality"), "got: {err}");
+    }
+
+    #[test]
+    fn validate_plan_rejects_marketplace_metadata_mismatch() {
+        let mut plan = worker_plan();
+        let mut curated = dataset("diabetes_readmission", "tabular", "readmitted");
+        curated.hf_id = plan.hf_id.clone();
+        curated.revision = plan.revision.clone();
+
+        plan.revision = "different-revision".to_string();
+        let err = validate_plan_matches_dataset(&plan, &curated).unwrap_err();
+        assert!(err.contains("revision"), "got: {err}");
+    }
+
+    #[test]
+    fn model_card_contains_contract_disclaimer_and_sanity_warning() {
+        let dir = temp_dir();
+        let dataset = dataset("diabetes_readmission", "tabular", "readmitted");
+        let plan = worker_plan();
+        let metrics = MetricsBlob {
+            schema_version: 1,
+            primary_metric: "accuracy".to_string(),
+            metric_value: 0.51,
+            baseline_metric: 0.50,
+            model_type: "xgboost".to_string(),
+            framework: "xgboost".to_string(),
+            device: "cpu".to_string(),
+            device_fallback: false,
+            warning: None,
+            examples: Vec::new(),
+        };
+
+        let card_path = generate_model_card(
+            &dir,
+            "Predict hospital readmission",
+            &dataset,
+            &plan,
+            &metrics,
+        )
+        .unwrap();
+        let card = fs::read_to_string(card_path).unwrap();
+
+        assert!(card.contains("51% accuracy"));
+        assert!(card.contains("baseline: 50%"));
+        assert!(card.contains("Dataset limitation for test."));
+        assert!(card.contains("Research and prototyping only"));
+        assert!(card.contains("not for clinical care"));
+        assert!(card.contains("Model may not be learning signal."));
     }
 
     #[test]
@@ -1027,11 +1274,13 @@ mod tests {
             model_type: "xgboost".to_string(),
             framework: "xgboost".to_string(),
             device: "cpu".to_string(),
+            modality: "tabular".to_string(),
             seed: 42,
             split: vec![0.8, 0.1, 0.1],
             primary_metric: "accuracy".to_string(),
             goal_text: Some("Smoke-test readmission fixture".to_string()),
             summary: Some("Local fixture smoke test".to_string()),
+            text_column: None,
             local_csv: Some(path_string(&fixture)),
         };
 

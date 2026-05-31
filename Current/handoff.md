@@ -1,74 +1,61 @@
 # Handoff — DocLab
 
-_Last updated: 2026-06-01_
+_Last updated: 2026-05-31_
 
 ## Where things stand
 
-**M0, M1, M2, M3, and M4 are done.** The next milestone is **M5** (end-to-end tabular loop),
-which is the Phase 1 integration gate — it wires the agent, swaps M4 mock data for live
-Tauri commands, and delivers the first complete prototype flow.
+**All milestones M0–M10 are done; M11 is partial.** The full stack is built and all three
+modality paths (tabular, image, text) work end-to-end. The remaining work is presenter-side
+demo rehearsal, not code.
 
-Milestone status (see `Current/MILESTONES.md` for the checklists):
-- ✅ **M0** — Tauri + React scaffold; Rust→Python `worker_healthcheck` bridge.
-- ✅ **M1** — curated marketplace: `marketplace/datasets.yaml` + Rust loader/query + SQLite mirror.
+Milestone status (see `Current/MILESTONES.md` for checklists, `Current/M*_PLAN.md` for per-milestone notes):
+- ✅ **M0** — Tauri + React scaffold; Rust→Python bridge; seed fallback bundle.
+- ✅ **M1** — curated marketplace: `datasets.yaml` + Rust loader/query + SQLite mirror.
 - ✅ **M2** — Python tabular worker: `plan.json` → train → `metrics.json` / `error.json`.
-- ✅ **M3** — Rust orchestration: `experiments.rs`, SQLite `experiments` table, 4 Tauri commands.
-- ✅ **M4** — React UI shell (8 screens) on mock data; merged via `feat/ui-shell`.
-- ⬜ **M5** — end-to-end loop (Phase 1 gate). **DO THIS NEXT.**
+- ✅ **M3** — Rust orchestration: `experiments.rs`, SQLite `experiments` table, Tauri commands.
+- ✅ **M4** — React UI shell (8 screens); originally mock data.
+- ✅ **M5** — end-to-end tabular loop (Phase 1 gate): agent wired, mock data replaced with live Tauri calls.
+- ✅ **M6** — `model_card.md` auto-generated (Rust) and rendered in Results via `react-markdown`.
+- ✅ **M7** — experiment history + best-run badging; first schema migration (`is_best`).
+- ✅ **M8** — hardening: prefetch, friendly errors, disclaimers audit, Fallback A seed run.
+- ✅ **M9** — image CNN path (PyTorch), `resolve_device()`, MPS→CPU fallback.
+- ✅ **M10** — text summarization path (LoRA t5-small), ROUGE-L, examples in card.
+- ◐ **M11** — demo rehearsal: machine items done (MPS warmup, Fallbacks A/B); presenter items open.
 
-What exists in the tree now:
-- `src/` — React UI shell: `router.tsx`, `App.tsx`, `components/` (AppShell, Sidebar,
-  TopAppBar, Disclaimer, Badge, Icon), `screens/` (Home, Plan, Training, Results,
-  Experiments, Models, Datasets, Settings), `mock/data.ts`. Tailwind v4 design system in `index.css`.
-- `src-tauri/` — Rust shell. `src/lib.rs` (7 commands: `greet`, `worker_healthcheck`,
-  `query_datasets`, `create_plan`, `run_experiment`, `list_experiments`, `get_experiment`),
-  `src/experiments.rs` (M3 orchestration), `src/marketplace.rs`, `src/db.rs` (creates
-  `~/.doclab/`, `datasets/`, `experiments/` on startup; `datasets` + `experiments` tables).
-  Crates: `serde_yaml`, `rusqlite` (bundled), `dirs`, `uuid`.
-- `worker/` — Python worker. `doclab_worker/` (`__main__.py`, `tabular.py`, `errors.py`),
-  `tests/` (fixture CSV + 4 pytest tests), `requirements.txt`, `.venv/` (gitignored).
-- `marketplace/datasets.yaml` — **4 curated entries** (tabular ×2, image ×1, text ×1);
-  research notes in `marketplace/DATASETS_RESEARCH.md`. Phase 1 worker trains
-  `diabetes_readmission` (M3 default); M9/M10 add image/text paths.
-- Per-milestone plans saved as `Current/M1_PLAN.md`, `Current/M2_PLAN.md`, `Current/M3_PLAN.md`.
-- Runtime data root `~/.doclab/` (`doclab.db`, `datasets/<id>/`, `experiments/<id>/`)
-  created on app startup.
+Most recent work: the `feat/ui-shell` motion/visual polish was merged into `master` (re-applied
+onto the real-data screens — count-up drives real metrics, no mock data), and the branch was
+retired. `master` is synced with origin.
 
-Docs (source of truth): `Current/spec.md`, `Current/DEMO.md`, `Current/MILESTONES.md`,
-`Current/UI.md`, `README.md`, `CLAUDE.md` / `AGENTS.md`. `Archived_Plans/` is superseded — don't build from it.
+## What exists in the tree
+
+- `src/` — React UI, fully wired to live Tauri commands. `agent/` (parser, selector, profiler),
+  `screens/` (Home, Plan, Training, Results, Experiments, Models, Datasets, Settings),
+  `components/`, `hooks/useCountUp.ts`, `lib/errors.ts`, `types/tauri.ts`. `mock/data.ts` remains
+  but is no longer the data source for the golden path.
+- `src-tauri/` — Rust shell: `lib.rs` (Tauri commands), `experiments.rs` (orchestration + model
+  card + best-run), `marketplace.rs`, `db.rs` (data root, tables, `add_column_if_missing` migration).
+- `worker/` — Python `doclab_worker`: `__main__.py` (modality dispatch), `tabular.py`, `image.py`,
+  `text.py`, `device.py`, `errors.py`; `scripts/prefetch.py`; `tests/` (tabular/image/text).
+- `marketplace/datasets.yaml` — curated entries (tabular ×2, image ×1, text ×1), all wired.
+- Runtime root `~/.doclab/` (`doclab.db`, `datasets/<id>/`, `experiments/<id>/`) created on startup.
+
+Docs (source of truth): `Current/spec.md`, `Current/MILESTONES.md`, `Current/DEMO.md`,
+`Current/TESTING.md`, `Current/UI.md`, per-milestone `Current/M*_PLAN.md`, `README.md`,
+`CLAUDE.md` / `AGENTS.md`. `Archived_Plans/` is superseded — don't build from it.
 
 ## What to do next
 
-**Build M5 — end-to-end tabular loop.** M3 provides the backend plumbing; M5 wires the
-agent and replaces M4 mock data with live Tauri commands. See the M5 checklist in
-`Current/MILESTONES.md`. In short:
-1. Agent parse goal → `intent.json` (task type, modality, metric hint). Rule-based is fine;
-   optional LLM call only for parsing (spec Option A/B). Dataset choice **constrained to
-   curated ids**.
-2. Agent select + profile dataset → `dataset_selection.json` + `data_profile.json`
-   (schema, label column, row count, missing %).
-3. Agent emit plan → call `create_plan` Tauri command, render on Plan review screen.
-4. On approve → call `run_experiment`, poll/stream status → Results screen with real metrics.
-5. Replace all M4 mock imports with live Tauri `invoke` calls.
-6. Error path: worker failure shows friendly message, experiment marked `failed`.
+The build is feature-complete. Remaining work is **M11 presenter-side rehearsal**, not code
+(see `Current/M11_PLAN.md` and `Current/DEMO.md`):
+1. Rehearse the golden tabular path on the **presentation laptop** (not just the dev machine).
+2. Prepare Fallback C assets (slides / screenshots / GIF of the loop) for a full app crash.
+3. Memorize the 30-second pitch; keep live timing within 4–5 min.
 
-After M5, **M6** generates `model_card.md` from the spec template, and **M7** adds
-best-run badging + cross-session history persistence.
+Fallbacks A (pre-completed seed run in history) and B (exported artifact bundle in
+`demo/seed_experiment/`) are already in place. MPS is warmed for the image + text paths.
 
-**Phase 1 exit:** type goal → approve plan → see accuracy + baseline + model card, < 5 min on a laptop.
-
-## Already-resolved decisions (were open at spec stage)
-
-- **Dataset cache** lives at `~/.doclab/datasets/<id>/` (worker sets `cache_dir`); DB at `~/.doclab/doclab.db`.
-- **Curated dataset id** is `imodels/diabetes-readmission` @ `191ab1f0…`, label `readmitted` (public, UCI-derived).
-- **Tabular metric** is accuracy vs. majority-class baseline (M2 verified: 0.643 vs 0.539 on the real set).
-- **macOS prereq**: XGBoost needs `brew install libomp` or it falls back to LogisticRegression (documented in worker/README).
-
-## Still-open decisions
-
-- Agent parsing: rule-based over `datasets.yaml` vs. optional LLM call (spec leans rule-based; decide in M5).
-- Text metric: ROUGE-L via `rouge-score` or `evaluate` (Phase 2 / M10).
-- Fill in real clock times for the MILESTONES timebox kill-switches once the hackathon end is known.
+If touching code: run the relevant tests before/after (see `Current/TESTING.md`), and keep the
+golden tabular path deterministic and offline-capable.
 
 ## Must-honor contracts (detail in Current/spec.md, CLAUDE.md, AGENTS.md)
 
@@ -79,6 +66,7 @@ best-run badging + cross-session history persistence.
 - Agent may only select dataset IDs that exist in the curated marketplace — never hallucinate one.
 - No live Hugging Face search at runtime.
 - Frameworks: tabular = XGBoost/sklearn, image = PyTorch, text = Transformers + PEFT LoRA (no Unsloth).
+- Every deep-learning run records `device` (`mps`/`cpu`) and `device_fallback`.
 
 ## Safety guardrails (non-negotiable)
 
@@ -91,14 +79,15 @@ best-run badging + cross-session history persistence.
 
 ## Build / test commands
 
-- **UI**: `npm run build` (tsc + vite), `npm run dev`, `npm run tauri dev` (full app).
-- **Rust**: `cargo test` / `cargo build` from `src-tauri/` (11 tests: 6 marketplace, 5 experiments).
-  Ignored worker smoke test: `cargo test -- --ignored worker_smoke`.
-- **Worker**: `worker/.venv/bin/python -m pytest worker/tests` (4 tabular tests);
+- **UI**: `npm run build` (tsc + vite — the frontend gate), `npm run tauri dev` (full app).
+- **Rust**: `cargo test -q` from `src-tauri/` (fast suite); `cargo test -- --ignored` for the
+  live worker smoke test.
+- **Worker**: `cd worker && python -m pytest -q` (tabular/image/text, offline + fast);
   run a job with `python -m doclab_worker --job <plan.json>`.
-- **M3 smoke (backend-only)**: `cargo test -- --ignored` runs a real plan → worker → SQLite roundtrip.
+- **Demo prep**: `python worker/scripts/prefetch.py` pre-caches datasets for an offline demo.
+- macOS: XGBoost needs `brew install libomp`; Python resolves venv-first
+  (`DOCLAB_PYTHON` → `worker/.venv/bin/python` → `python3`).
 
-## Notes
+## Still-open decisions
 
-- If time runs short, ship Phase 1 only; keep image/text as "coming soon" but leave modality logic in place.
-- The M4 UI is wired to `mock/data.ts`; M5 replaces those imports with live Tauri command calls.
+- Fill in real clock times for the MILESTONES timebox kill-switches once the hackathon end is known.

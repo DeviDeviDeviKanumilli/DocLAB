@@ -1,5 +1,7 @@
-// Dataset profiling (Phase 1 stub)
-// Real profiling requires loading the dataset; M5 uses hardcoded values
+// Lightweight dataset profiling for the plan artifacts.
+// Full profiling happens in the worker; this keeps the staged UI deterministic.
+
+import type { Dataset } from "../types/tauri";
 
 export interface DataProfile {
   schema: string[];
@@ -8,14 +10,28 @@ export interface DataProfile {
   missing_percent: number;
 }
 
-export async function profileDataset(_datasetId: string): Promise<DataProfile> {
-  // Phase 1: return stub profile
-  // Real profiling would require loading the dataset via Python worker
-  // M6 can enhance this or make it optional
+export async function profileDataset(dataset: Dataset): Promise<DataProfile> {
+  const dataType = dataset.dataType.toLowerCase();
+
   return {
-    schema: ["feature_1", "feature_2", "...", "label"],
-    label_column: "readmitted", // hardcoded for diabetes_readmission
-    row_count: 101766,
-    missing_percent: 2.5,
+    schema: schemaFor(dataset),
+    label_column: dataset.labelColumn,
+    row_count: rowCountHint(dataset.size),
+    missing_percent: dataType === "tabular" ? 2.5 : 0,
   };
+}
+
+function schemaFor(dataset: Dataset): string[] {
+  const dataType = dataset.dataType.toLowerCase();
+  if (dataType === "image") return ["image", dataset.labelColumn];
+  if (dataType === "text") return ["Text", dataset.labelColumn];
+  return ["clinical_features", "encounter_features", dataset.labelColumn];
+}
+
+function rowCountHint(size: string): number {
+  const compact = size.match(/~?(\d+(?:\.\d+)?)\s*k/i);
+  if (compact) return Math.round(Number(compact[1]) * 1000);
+
+  const firstNumber = size.match(/\d+/);
+  return firstNumber ? Number(firstNumber[0]) : 0;
 }
