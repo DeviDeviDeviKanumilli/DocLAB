@@ -5,6 +5,7 @@ import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { Badge } from "../components/Badge";
 import { useRouter } from "../router";
+import { friendlyError } from "../lib/errors";
 import type { ExperimentDetail } from "../types/tauri";
 
 export function Results() {
@@ -192,22 +193,25 @@ export function Results() {
                 Experiment Failed
               </h3>
             </div>
-            <p className="font-body-md text-text-primary mb-2">
-              <strong>Error code:</strong> {detail.errorCode || "unknown"}
+            <p className="font-body-md text-text-primary mb-4">
+              {friendlyError(detail.errorCode)}
             </p>
-            <p className="font-body-md text-text-secondary mb-4">
-              {detail.errorMessage || "Worker failed without error details"}
-            </p>
-            {detail.workerStderr && (
-              <details className="mt-4">
-                <summary className="cursor-pointer font-body-md text-text-primary">
-                  View stderr
-                </summary>
+            <details className="mt-2">
+              <summary className="cursor-pointer font-label-sm text-label-sm text-text-muted">
+                Technical details
+              </summary>
+              <p className="mt-2 font-body-md text-text-secondary">
+                <strong>Error code:</strong> {detail.errorCode || "unknown"}
+              </p>
+              <p className="mt-1 font-body-md text-text-secondary">
+                {detail.errorMessage || "Worker failed without error details"}
+              </p>
+              {detail.workerStderr && (
                 <pre className="mt-2 rounded bg-log-bg p-3 font-code-sm text-code-sm text-log-text overflow-x-auto">
                   {detail.workerStderr}
                 </pre>
-              </details>
-            )}
+              )}
+            </details>
           </div>
         )}
       </div>

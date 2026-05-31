@@ -100,6 +100,12 @@ pub fn run() {
         Err(e) => eprintln!("warning: failed to open doclab.db: {e}"),
     }
 
+    // Fallback A (DEMO.md): a pre-completed run in history, ready to open if a
+    // live demo run fails or runs long. Non-fatal — the app works without it.
+    if let Err(e) = experiments::seed_demo_experiment() {
+        eprintln!("warning: failed to seed demo experiment: {e}");
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(market)

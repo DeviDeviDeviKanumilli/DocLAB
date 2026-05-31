@@ -15,6 +15,7 @@ Full product context: [spec.md](./spec.md)
 
 - [ ] App builds and opens without errors
 - [ ] At least **one tabular** dataset cached locally (no download during demo)
+      — run `cd worker && .venv/bin/python scripts/prefetch.py` to cache all tabular datasets ahead of time
 - [ ] Run the golden path **once end-to-end**; note actual accuracy and training time
 - [ ] Open a completed **model card** in advance (backup tab or PDF export)
 - [ ] **Experiment history** has at least one prior run (shows iteration story)

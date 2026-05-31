@@ -1,15 +1,16 @@
 {
   "schema_version": 1,
-  "_note": "Placeholder Fallback B bundle (DEMO.md). Replaced with a real run once M5/M6 land.",
-  "goal_text": "I want to predict whether a patient is likely to be readmitted to the hospital.",
-  "dataset_id": "PLACEHOLDER_tabular_readmission",
-  "task": "binary classification",
-  "modality": "tabular",
+  "dataset_id": "diabetes_readmission",
+  "hf_id": "imodels/diabetes-readmission",
+  "revision": "191ab1f0aa68d52f6cd55d68df57849fad1751ca",
+  "label_column": "readmitted",
   "model_type": "xgboost",
   "framework": "xgboost",
   "device": "cpu",
   "seed": 42,
   "split": [0.8, 0.1, 0.1],
   "primary_metric": "accuracy",
-  "summary": "Train an XGBoost classifier to predict hospital readmission on a curated public tabular dataset; report accuracy against a majority-class baseline."
+  "goal_text": "I want to predict whether a patient is likely to be readmitted to the hospital.",
+  "summary": "Train a decision-tree tabular prototype on Diabetes 130-US Hospitals Readmission and report accuracy against a majority-class baseline.",
+  "local_csv": null
 }

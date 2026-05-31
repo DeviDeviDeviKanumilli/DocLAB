@@ -690,6 +690,78 @@ fn write_agent_artifacts(
     Ok(())
 }
 
+const DEMO_SEED_ID: &str = "exp_demo_seed";
+
+fn seed_bundle_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../demo/seed_experiment")
+}
+
+/// Seed the Fallback A demo run (DEMO.md): a pre-completed experiment that
+/// appears in history with a working model card, ready to open if a live run
+/// fails or runs long during the demo. Idempotent — skips if already seeded.
+pub fn seed_demo_experiment() -> Result<(), String> {
+    let conn = db::open_db()?;
+    let already_seeded = conn
+        .query_row(
+            "SELECT 1 FROM experiments WHERE id=?1",
+            params![DEMO_SEED_ID],
+            |_| Ok(()),
+        )
+        .optional()
+        .map_err(|e| format!("cannot check demo seed: {e}"))?
+        .is_some();
+    if already_seeded {
+        return Ok(());
+    }
+
+    let bundle = seed_bundle_dir();
+    let plan_src = bundle.join("plan.json");
+    let metrics_src = bundle.join("metrics.json");
+    let card_src = bundle.join("model_card.md");
+    if !plan_src.exists() || !metrics_src.exists() || !card_src.exists() {
+        return Err(format!("demo seed bundle incomplete at {}", bundle.display()));
+    }
+
+    let dir = db::experiments_dir()?.join(DEMO_SEED_ID);
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create demo seed dir: {e}"))?;
+    let plan_dst = dir.join("plan.json");
+    let metrics_dst = dir.join("metrics.json");
+    let card_dst = dir.join("model_card.md");
+    fs::copy(&plan_src, &plan_dst).map_err(|e| format!("cannot copy seed plan: {e}"))?;
+    fs::copy(&metrics_src, &metrics_dst).map_err(|e| format!("cannot copy seed metrics: {e}"))?;
+    fs::copy(&card_src, &card_dst).map_err(|e| format!("cannot copy seed card: {e}"))?;
+
+    let (metrics, _) = parse_metrics_file(&metrics_dst)?;
+    let plan: WorkerPlan = serde_json::from_str(
+        &fs::read_to_string(&plan_dst).map_err(|e| format!("cannot read seed plan: {e}"))?,
+    )
+    .map_err(|e| format!("seed plan is invalid: {e}"))?;
+    let goal_text = plan
+        .goal_text
+        .clone()
+        .unwrap_or_else(|| "Demo readmission prototype".to_string());
+
+    insert_running(
+        &conn,
+        DEMO_SEED_ID,
+        now_ms(),
+        &goal_text,
+        &plan.dataset_id,
+        &path_string(&plan_dst),
+    )?;
+    update_complete(
+        &conn,
+        DEMO_SEED_ID,
+        &metrics,
+        &path_string(&metrics_dst),
+        &path_string(&card_dst),
+        "",
+        "",
+    )?;
+    recompute_best_for_goal(&conn, &goal_text)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

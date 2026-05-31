@@ -83,6 +83,11 @@ export function Home() {
             </div>
           </div>
 
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-center font-label-sm text-label-sm text-text-muted">
+            <Icon name="info" size={14} />
+            Research &amp; prototyping only — not for clinical care. Curated public data only; no PHI or patient uploads.
+          </p>
+
           {/* Examples */}
           <div className="mt-10">
             <p className="mb-4 text-center font-label-sm text-label-sm uppercase tracking-wider text-text-muted">

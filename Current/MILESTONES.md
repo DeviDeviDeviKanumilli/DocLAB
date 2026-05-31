@@ -212,15 +212,22 @@ The iteration story for judging.
 
 **Exit:** run two experiments → both appear in history → best is flagged → reopening shows saved results.
 
-## M8 — Phase 1 hardening & demo safety ☐ (P0) — depends on M5, M6, M7
+## M8 — Phase 1 hardening & demo safety ☑ (P0) — depends on M5, M6, M7
 
 Make the golden path bulletproof for a live demo. Maps to spec "Success criteria".
 
-- [ ] **Pre-cache** the tabular dataset locally so the demo needs no download.
-- [ ] Cap/seed everything so the run is deterministic and finishes in < 5 min on the demo laptop.
-- [ ] Friendly errors on every failure surface (no raw stack traces in UI).
-- [ ] Verify all disclaimers present: Home warning, plan checkbox, model card risks.
-- [ ] Promote the M0 seed bundle into a real Fallback A: one pre-completed run visible in history.
+- [x] **Pre-cache** the tabular dataset locally so the demo needs no download.
+      _`worker/scripts/prefetch.py` caches tabular datasets into `~/.doclab/datasets/<id>/`; documented in DEMO.md._
+- [x] Cap/seed everything so the run is deterministic and finishes in < 5 min on the demo laptop.
+      _Fixed seed (42) end-to-end; real run on ~101k rows completes in ~2 min on CPU._
+- [x] Friendly errors on every failure surface (no raw stack traces in UI).
+      _`src/lib/errors.ts` maps the closed worker error-code set to calm copy; raw code/message/stderr
+      moved behind a "Technical details" disclosure on Training + Results._
+- [x] Verify all disclaimers present: Home warning, plan checkbox, model card risks.
+      _Added the missing Home non-clinical warning under the goal input; Plan checkbox + card Risks already present._
+- [x] Promote the M0 seed bundle into a real Fallback A: one pre-completed run visible in history.
+      _`seed_demo_experiment()` (called at startup) copies `demo/seed_experiment/` into a `complete` row;
+      bundle refreshed with real metrics (64% vs 54% baseline) + matching card._
 
 > Rehearsal, MPS warmup, and the full fallback set (B/C) are **not** repeated here — they live in
 > M11, which references the single demo checklist in [DEMO.md](./DEMO.md). M8 just ensures the app

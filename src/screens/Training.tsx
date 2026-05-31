@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
+import { friendlyError } from "../lib/errors";
 import type { ExperimentDetail } from "../types/tauri";
 
 interface Step {
@@ -186,11 +187,19 @@ export function Training() {
               </h3>
             </div>
             <p className="font-body-md text-text-primary mb-4">
-              Error code: {detail.errorCode || "unknown"}
+              {friendlyError(detail.errorCode)}
             </p>
-            <p className="font-body-md text-text-secondary">
-              {detail.errorMessage || "Worker failed without error details"}
-            </p>
+            <details className="mb-2">
+              <summary className="cursor-pointer font-label-sm text-label-sm text-text-muted">
+                Technical details
+              </summary>
+              <p className="mt-2 font-body-md text-text-secondary">
+                Error code: {detail.errorCode || "unknown"}
+              </p>
+              <p className="mt-1 font-body-md text-text-secondary">
+                {detail.errorMessage || "Worker failed without error details"}
+              </p>
+            </details>
             <div className="mt-4 flex gap-3">
               <button
                 onClick={() => navigate("home")}
