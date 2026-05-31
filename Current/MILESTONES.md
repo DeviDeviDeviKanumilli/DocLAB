@@ -295,17 +295,22 @@ ROUGE-L + 3 examples in the card.
 
 # Cross-cutting milestone
 
-## M11 — Final demo rehearsal & fallbacks ☐ (P0) — depends on whatever phases shipped
+## M11 — Final demo rehearsal & fallbacks ◐ (P0) — depends on whatever phases shipped
 
 Per [DEMO.md](./DEMO.md). Do this last, regardless of how far image/text got.
 
-- [ ] 15-min pre-demo checklist passes (app builds, dataset cached, power, notifications off).
-- [ ] Golden tabular path rehearsed on the **presentation laptop** (not just dev machine).
-- [ ] For any deep-learning path shipped: one **MPS warmup** dry run so Metal is compiled.
-- [ ] Fallback A (training slow/fails): pre-completed run in history ready to open.
-- [ ] Fallback B (agent/plan fails): exported artifact bundle (`plan.json`/`metrics.json`/`model_card.md`).
-- [ ] Fallback C (app crash): slides/screenshots/GIF of the loop.
-- [ ] 30-second pitch memorized; timing within 4–5 min live.
+- [~] 15-min pre-demo checklist passes (app builds, dataset cached, power, notifications off).
+      _Verified on dev machine: frontend build green, all 3 datasets cached in `~/.doclab/datasets/`.
+      Power/notifications/laptop items are presenter-side._
+- [ ] Golden tabular path rehearsed on the **presentation laptop** (not just dev machine). _Presenter._
+- [x] For any deep-learning path shipped: one **MPS warmup** dry run so Metal is compiled.
+      _Real MPS runs completed for both image (M9) and text (M10) — Metal kernels compiled on this machine._
+- [x] Fallback A (training slow/fails): pre-completed run in history ready to open.
+      _`seed_demo_experiment()` seeds a `complete` run at startup (M8)._
+- [x] Fallback B (agent/plan fails): exported artifact bundle (`plan.json`/`metrics.json`/`model_card.md`).
+      _`demo/seed_experiment/` holds a real, consistent bundle (64% vs 54% baseline)._
+- [ ] Fallback C (app crash): slides/screenshots/GIF of the loop. _Presenter._
+- [ ] 30-second pitch memorized; timing within 4–5 min live. _Presenter._
 
 **Exit:** can deliver the demo end-to-end and recover gracefully from any single failure.
 
