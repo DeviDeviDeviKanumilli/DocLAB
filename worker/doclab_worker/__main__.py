@@ -4,12 +4,17 @@ Usage:
     python -m doclab_worker --help
     python -m doclab_worker --job <path/to/plan.json>
 
-M0 ships only the CLI skeleton. Training (load -> preprocess -> split ->
-train -> metrics.json) is implemented in M2.
+Reads a plan.json, runs the tabular pipeline, and writes `metrics.json`
+beside the plan on success — or `error.json` + non-zero exit on failure.
 """
 
 import argparse
+import json
 import sys
+from pathlib import Path
+
+from . import tabular
+from .errors import WorkerError, write_error_json
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,6 +30,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def data_root() -> Path:
+    root = Path.home() / ".doclab"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def run_job(plan_path: Path) -> dict:
+    """Chain the tabular pipeline. Raises WorkerError on any failure."""
+    plan = tabular.load_plan(plan_path)
+    df = tabular.load_data(plan, data_root())
+    X, y = tabular.preprocess(df, plan.get("label_column", ""))
+    splits = tabular.split(X, y, plan["split"], plan["seed"])
+    (X_tr, y_tr), _, (X_te, y_te) = splits
+    model, model_type, framework = tabular.train(X_tr, y_tr, plan["seed"])
+    accuracy, baseline = tabular.evaluate(model, X_te, y_te)
+    return tabular.build_metrics(
+        plan, accuracy, baseline, splits, model_type, framework
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -33,11 +58,29 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    print(
-        f"doclab_worker: received job '{args.job}', but training is not "
-        "implemented until milestone M2.",
-        file=sys.stderr,
-    )
+    plan_path = Path(args.job)
+    job_dir = plan_path.parent
+    metrics_path = job_dir / "metrics.json"
+    error_path = job_dir / "error.json"
+
+    try:
+        metrics = run_job(plan_path)
+    except WorkerError as err:
+        write_error_json(error_path, err)
+        return 1
+    except Exception as e:  # never crash without honoring the error contract
+        write_error_json(error_path, WorkerError("unknown", "train", str(e)))
+        return 1
+
+    try:
+        metrics_path.write_text(json.dumps(metrics, indent=2))
+    except OSError as e:
+        write_error_json(
+            error_path, WorkerError("unknown", "write", f"cannot write metrics: {e}")
+        )
+        return 1
+
+    print(f"wrote {metrics_path}")
     return 0
 
 

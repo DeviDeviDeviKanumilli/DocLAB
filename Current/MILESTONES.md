@@ -92,25 +92,28 @@ The curated index the agent is allowed to choose from. **No live HF search ever.
 
 **Exit:** a query call returns a ranked list of curated datasets; agent can only see these ids.
 
-## M2 — Tabular training worker ☐ (P0) — depends on M0, M1
+## M2 — Tabular training worker ☑ (P0) — depends on M0, M1
 
 The Python engine. JSON in (`plan.json`) → JSON out (`metrics.json`). **Contract-critical.**
 
-- [ ] `python -m doclab_worker --job <plan.json>` reads plan, writes `metrics.json` beside it.
-- [ ] Load dataset from local HF cache (download once to `datasets/<id>/`, pinned revision).
-- [ ] Preprocess: handle missing values, encode categoricals, separate `label_column`.
-- [ ] Split 80/10/10 with **fixed seed** (record seed in metrics).
-- [ ] Train XGBoost classifier; fallback to sklearn LogisticRegression if XGBoost errors.
-- [ ] Compute test **accuracy** + **majority-class baseline accuracy**.
-- [ ] Emit `metrics.json` — **contract**: `schema_version:1, primary_metric, metric_value,
+- [x] `python -m doclab_worker --job <plan.json>` reads plan, writes `metrics.json` beside it.
+- [x] Load dataset from local HF cache (download once to `datasets/<id>/`, pinned revision).
+      _`local_csv` mode added for offline fixture tests._
+- [x] Preprocess: handle missing values, encode categoricals, separate `label_column`.
+- [x] Split 80/10/10 with **fixed seed** (record seed in metrics).
+- [x] Train XGBoost classifier; fallback to sklearn LogisticRegression if XGBoost errors.
+      _macOS needs `brew install libomp` for XGBoost; documented in worker/README._
+- [x] Compute test **accuracy** + **majority-class baseline accuracy**.
+- [x] Emit `metrics.json` — **contract**: `schema_version:1, primary_metric, metric_value,
       baseline_metric, device:"cpu", seed, split, n_train/n_val/n_test, model_type, framework`.
-- [ ] Worker exits non-zero with a JSON error blob on failure (Rust needs to detect this).
+- [x] Worker exits non-zero with a JSON error blob on failure (Rust needs to detect this).
       **Error contract** (write to `error.json` beside the plan + echo to stderr):
       `{ "schema_version": 1, "code": "<machine_slug>", "message": "<human text>",
       "stage": "load|preprocess|train|eval|write", "device_fallback": false }`.
       `code` values are a closed set: `dataset_missing`, `bad_plan`, `train_failed`,
       `oom`, `unknown`.
-- [ ] Test on a tiny fixture CSV: deterministic accuracy across two runs (seed works).
+- [x] Test on a tiny fixture CSV: deterministic accuracy across two runs (seed works).
+      _4 pytest tests green; real smoke: accuracy 0.643 > baseline 0.539._
 
 **Exit:** run worker by hand on a sample plan → valid `metrics.json` with accuracy + baseline.
 
