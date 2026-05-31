@@ -12,16 +12,18 @@ const MODALITY_TONE: Record<string, "neutral"> = {
   text: "neutral",
 };
 
-/** A goal sentence to seed the Home composer when a dataset is picked. */
-function goalForDataset(d: Dataset): string {
-  if (d.description?.trim()) return d.description.trim();
-  return `Prototype a model using the ${d.name} dataset.`;
-}
-
 export function Datasets() {
-  const { navigate } = useRouter();
+  const { navigate, params } = useRouter();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Picking a dataset pins it on the Home composer; carry any typed goal back.
+  function selectDataset(dataset: Dataset) {
+    navigate("home", {
+      attachedDataset: dataset,
+      prefillGoal: (params.goal as string) ?? "",
+    });
+  }
 
   useEffect(() => {
     invoke<Dataset[]>("query_datasets", {
@@ -68,11 +70,11 @@ export function Datasets() {
               key={dataset.id}
               role="button"
               tabIndex={0}
-              onClick={() => navigate("home", { prefillGoal: goalForDataset(dataset) })}
+              onClick={() => selectDataset(dataset)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  navigate("home", { prefillGoal: goalForDataset(dataset) });
+                  selectDataset(dataset);
                 }
               }}
               className="group cursor-pointer rounded-lg border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-border-strong hover:shadow-sm"

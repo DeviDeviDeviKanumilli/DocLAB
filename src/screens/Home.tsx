@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
+import type { Dataset } from "../types/tauri";
 
 interface Example {
   icon: string;
@@ -40,11 +41,18 @@ const EXAMPLES: Example[] = [
 export function Home() {
   const { navigate, params } = useRouter();
   const [goal, setGoal] = useState((params.prefillGoal as string) ?? "");
+  const [attached, setAttached] = useState<Dataset | null>(
+    (params.attachedDataset as Dataset) ?? null,
+  );
 
   function start(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    navigate("plan", { goal: trimmed });
+    // Fold the attached dataset into the goal so the agent prefers it.
+    const fullGoal = attached
+      ? `${trimmed} (using the ${attached.name} dataset)`
+      : trimmed;
+    navigate("plan", { goal: fullGoal, datasetId: attached?.id });
   }
 
   return (
@@ -67,14 +75,36 @@ export function Home() {
               placeholder="I want to predict hospital readmission risk from patient-style tabular data..."
               className="h-[160px] w-full resize-none border-none bg-transparent p-4 font-body-md text-body-md text-text-primary placeholder:text-text-disabled focus:outline-none focus:ring-0"
             />
+            {/* Attached dataset chip */}
+            {attached && (
+              <div className="px-3 pb-2">
+                <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border-strong bg-surface-muted py-1.5 pl-2.5 pr-1.5 font-label-sm text-label-sm text-text-primary animate-fade-in">
+                  <Icon name="database" size={14} className="shrink-0 text-text-secondary" />
+                  <span className="truncate">{attached.name}</span>
+                  <button
+                    type="button"
+                    aria-label="Remove dataset"
+                    onClick={() => setAttached(null)}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-text-primary"
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-3 pb-2">
               <button
                 type="button"
-                onClick={() => navigate("datasets")}
-                className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-label-sm text-label-sm text-text-secondary transition-all hover:border-border-strong hover:bg-surface-muted active:scale-[0.98]"
+                onClick={() => navigate("datasets", { goal })}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-label-sm text-label-sm transition-all active:scale-[0.98] ${
+                  attached
+                    ? "border-border-strong bg-surface-muted text-text-primary"
+                    : "border-border text-text-secondary hover:border-border-strong hover:bg-surface-muted"
+                }`}
               >
-                <Icon name="attach_file" size={16} />
-                Attach dataset
+                <Icon name={attached ? "swap_horiz" : "attach_file"} size={16} />
+                {attached ? "Change dataset" : "Attach dataset"}
               </button>
               <button
                 onClick={() => start(goal)}
