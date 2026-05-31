@@ -19,6 +19,52 @@ function modelFamilyLabel(modelType?: string | null): string {
   return modelType || "Unknown";
 }
 
+/** Donut gauge whose arc sweeps to `fraction` (0–1) on mount. */
+function MetricRing({ fraction }: { fraction: number }) {
+  const r = 26;
+  const circumference = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, fraction));
+  const [dash, setDash] = useState(0);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDash(pct * circumference), 300);
+    return () => clearTimeout(id);
+  }, [pct, circumference]);
+
+  return (
+    <div className="relative h-14 w-14 shrink-0">
+      <svg viewBox="0 0 64 64" className="h-14 w-14 -rotate-90">
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          fill="none"
+          stroke="var(--color-surface-container-high)"
+          strokeWidth="6"
+        />
+        <circle
+          cx="32"
+          cy="32"
+          r={r}
+          fill="none"
+          stroke="var(--color-accent)"
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference - dash}
+          style={{ transition: "stroke-dashoffset 1.1s var(--ease-out-expo)" }}
+        />
+      </svg>
+      <Icon
+        name="check"
+        size={18}
+        className="pop absolute inset-0 m-auto flex h-fit w-fit items-center justify-center text-accent"
+        style={{ animationDelay: "0.6s" } as CSSProperties}
+      />
+    </div>
+  );
+}
+
 /** Animated metric value: counts up from 0 on mount. */
 function CountValue({
   target,
@@ -63,7 +109,7 @@ export function Results() {
       <AppShell title="Results">
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
-            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-primary" />
+            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-accent" />
             <p className="font-headline-md text-headline-md text-text-primary">
               Loading results...
             </p>
@@ -131,7 +177,7 @@ export function Results() {
               View experiment
             </button>
             {detail.modelCardPath && (
-              <button className="rounded bg-primary px-4 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface">
+              <button className="rounded bg-accent px-4 py-2 font-headline-md text-headline-md text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98]">
                 Open model card
               </button>
             )}
@@ -141,7 +187,7 @@ export function Results() {
         {detail.status === "complete" && (
           <>
             {/* Summary strip */}
-            <div className="stagger mb-6 flex flex-wrap gap-x-12 gap-y-4 border-b border-border pb-6">
+            <div className="stagger mb-6 flex flex-wrap items-center gap-x-12 gap-y-4 border-b border-border pb-6">
               <div className="flex flex-col gap-0.5" style={{ "--i": 1 } as CSSProperties}>
                 <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
                   Model family
@@ -150,20 +196,25 @@ export function Results() {
                   {modelFamilyLabel(detail.modelType)}
                 </div>
               </div>
-              <div className="flex flex-col gap-0.5" style={{ "--i": 2 } as CSSProperties}>
-                <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
-                  {metricLabel}
-                </div>
-                <div className="flex items-baseline gap-2 text-headline-md text-text-primary font-headline-md">
-                  <CountValue
-                    target={metricTarget}
-                    decimals={isSimilarityMetric ? 2 : 1}
-                    suffix={isSimilarityMetric ? "" : "%"}
-                    delay={250}
-                  />
-                  {!isSimilarityMetric && (
-                    <span className="font-label-sm text-success-text">{deltaStr} vs baseline</span>
-                  )}
+              <div className="flex items-center gap-3" style={{ "--i": 2 } as CSSProperties}>
+                <MetricRing fraction={metricValue} />
+                <div className="flex flex-col gap-0.5">
+                  <div className="font-label-sm text-label-sm uppercase tracking-wider text-text-muted">
+                    {metricLabel}
+                  </div>
+                  <div className="flex items-baseline gap-2 font-headline-md">
+                    <span className="text-[26px] leading-none font-semibold tracking-tight text-accent">
+                      <CountValue
+                        target={metricTarget}
+                        decimals={isSimilarityMetric ? 2 : 1}
+                        suffix={isSimilarityMetric ? "" : "%"}
+                        delay={250}
+                      />
+                    </span>
+                    {!isSimilarityMetric && (
+                      <span className="font-label-sm text-success-text">{deltaStr} vs baseline</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex flex-col gap-0.5" style={{ "--i": 3 } as CSSProperties}>
@@ -191,7 +242,7 @@ export function Results() {
             </div>
 
             {/* Sanity message */}
-            <div className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-3 ${
+            <div data-reveal className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-3 ${
               isSimilarityMetric
                 ? "border-border bg-surface text-text-secondary"
                 : sanityPassed
@@ -210,7 +261,7 @@ export function Results() {
             </div>
 
             {/* Model card */}
-            <div className="overflow-hidden rounded-xl border border-border">
+            <div data-reveal style={{ "--reveal-delay": "80ms" } as CSSProperties} className="overflow-hidden rounded-xl border border-border">
               <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <div className="flex items-center gap-2">
                   <Icon name="article" className="text-text-secondary" />
@@ -218,7 +269,7 @@ export function Results() {
                     Model card
                   </h3>
                 </div>
-                <button className="flex items-center gap-1 font-label-sm text-label-sm text-text-muted underline underline-offset-4 transition-colors hover:text-primary">
+                <button className="flex items-center gap-1 font-label-sm text-label-sm text-text-muted underline underline-offset-4 transition-colors hover:text-accent">
                   <Icon name="download" size={16} /> Export PDF
                 </button>
               </div>

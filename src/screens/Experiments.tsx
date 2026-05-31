@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
@@ -35,7 +35,7 @@ export function Experiments() {
       <AppShell title="Experiments">
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
-            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-primary" />
+            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-accent" />
             <p className="font-headline-md text-headline-md text-text-primary">
               Loading experiments...
             </p>
@@ -50,9 +50,12 @@ export function Experiments() {
       <div className="mx-auto max-w-[1080px] p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="font-headline-lg text-headline-lg text-text-primary">
-              Experiments
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <span className="h-7 w-1 rounded-full bg-accent" />
+              <h1 className="font-headline-lg text-headline-lg text-text-primary">
+                Experiments
+              </h1>
+            </div>
             <p className="mt-1 font-body-md text-text-muted">
               Every prototype run, newest first.
             </p>
@@ -73,7 +76,7 @@ export function Experiments() {
             </p>
             <button
               onClick={() => navigate("home")}
-              className="rounded bg-primary px-4 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-colors hover:bg-inverse-surface"
+              className="rounded bg-accent px-4 py-2 font-headline-md text-headline-md text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98]"
             >
               Go to Home
             </button>
@@ -92,12 +95,14 @@ export function Experiments() {
                     <th className="px-4 py-3 text-right font-normal">Date</th>
                   </tr>
                 </thead>
-                <tbody className="stagger divide-y divide-border font-body-md text-body-md text-text-primary">
-                  {experiments.map((exp) => (
+                <tbody className="divide-y divide-border font-body-md text-body-md text-text-primary">
+                  {experiments.map((exp, i) => (
                     <tr
                       key={exp.id}
+                      data-reveal="fade"
+                      style={{ "--reveal-delay": `${Math.min(i, 9) * 45}ms` } as CSSProperties}
                       onClick={() => navigate("results", { experimentId: exp.id })}
-                      className="group cursor-pointer transition-colors hover:bg-surface-muted hover:shadow-[inset_3px_0_0_0_var(--color-primary)]"
+                      className="group cursor-pointer transition-colors hover:bg-accent/5 hover:shadow-[inset_3px_0_0_0_var(--color-accent)]"
                     >
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className="rounded bg-surface-container px-2 py-1 font-code-sm text-code-sm text-text-secondary">

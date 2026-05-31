@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
@@ -6,14 +6,20 @@ import { Icon } from "../components/Icon";
 function Section({
   icon,
   title,
+  delay = 0,
   children,
 }: {
   icon: string;
   title: string;
+  delay?: number;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface-container-lowest p-6">
+    <section
+      data-reveal
+      style={{ "--reveal-delay": `${delay}ms` } as CSSProperties}
+      className="rounded-xl border border-border bg-surface-container-lowest p-6"
+    >
       <h3 className="mb-4 flex items-center gap-2 font-headline-md text-headline-md text-primary">
         <Icon name={icon} className="text-text-muted" />
         <span>{title}</span>
@@ -32,7 +38,7 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-border bg-background px-4 py-2 text-text-primary focus:border-border-strong focus:outline-none transition-colors";
+  "w-full rounded-lg border border-border bg-background px-4 py-2 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent/40 focus:outline-none transition-colors";
 
 export function Settings() {
   const [worker, setWorker] = useState<{
@@ -54,7 +60,7 @@ export function Settings() {
     <AppShell title="Settings">
       <div className="mx-auto w-full max-w-[1080px] space-y-6 p-8">
         {/* Workspace */}
-        <Section icon="domain" title="Workspace">
+        <Section icon="domain" title="Workspace" delay={0}>
           <div className="space-y-4">
             <div className="mb-2 flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-muted">
@@ -78,7 +84,7 @@ export function Settings() {
         </Section>
 
         {/* Agent config */}
-        <Section icon="smart_toy" title="Agent configuration">
+        <Section icon="smart_toy" title="Agent configuration" delay={60}>
           <div className="space-y-6">
             <div className="space-y-2">
               <Label>Plan parsing</Label>
@@ -115,7 +121,7 @@ export function Settings() {
                       type="radio"
                       name="verbosity"
                       defaultChecked={v === "Standard"}
-                      className="border-border text-primary focus:ring-primary"
+                      className="border-border text-accent accent-accent focus:ring-accent"
                     />
                     <span className="text-text-primary">{v}</span>
                   </label>
@@ -126,7 +132,7 @@ export function Settings() {
         </Section>
 
         {/* System / worker */}
-        <Section icon="dns" title="System &amp; worker">
+        <Section icon="dns" title="System &amp; worker" delay={120}>
           <div className="space-y-3">
             <p className="font-body-md text-body-md text-text-secondary">
               Verify the local Python training worker is reachable from the Rust
@@ -136,7 +142,7 @@ export function Settings() {
               <button
                 onClick={checkWorker}
                 disabled={worker.state === "checking"}
-                className="rounded-lg bg-primary px-4 py-2 font-label-sm text-label-sm text-on-primary transition-colors hover:bg-inverse-surface disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 font-label-sm text-label-sm text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
               >
                 {worker.state === "checking" ? "Checking…" : "Check worker"}
               </button>
@@ -160,12 +166,12 @@ export function Settings() {
         </Section>
 
         {/* Security */}
-        <Section icon="security" title="Security &amp; access">
+        <Section icon="security" title="Security &amp; access" delay={180}>
           <div className="space-y-2">
             <Label>Your role</Label>
             <div className="flex items-center justify-between rounded-lg border border-border bg-surface-muted p-3">
               <div className="flex items-center gap-2">
-                <Icon name="admin_panel_settings" className="text-primary" />
+                <Icon name="admin_panel_settings" className="text-accent" />
                 <span className="font-semibold text-text-primary">
                   Administrator
                 </span>
@@ -182,11 +188,11 @@ export function Settings() {
         </Section>
 
         {/* Actions */}
-        <div className="flex justify-end gap-4 border-t border-border pt-6">
+        <div data-reveal className="flex justify-end gap-4 border-t border-border pt-6">
           <button className="rounded-lg border border-border-strong px-6 py-2 font-label-sm text-label-sm text-text-primary transition-colors hover:bg-surface-muted">
             Discard changes
           </button>
-          <button className="rounded-lg bg-primary px-6 py-2 font-label-sm text-label-sm text-on-primary transition-colors hover:bg-inverse-surface">
+          <button className="rounded-lg bg-accent px-6 py-2 font-label-sm text-label-sm text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98]">
             Save settings
           </button>
         </div>

@@ -65,7 +65,7 @@ export function Training() {
       <AppShell title="Training">
         <div className="flex h-full items-center justify-center">
           <div className="text-center">
-            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-primary" />
+            <Icon name="hourglass_empty" size={48} className="mx-auto mb-4 animate-pulse text-accent" />
             <p className="font-headline-md text-headline-md text-text-primary">
               Loading experiment...
             </p>
@@ -103,7 +103,7 @@ export function Training() {
           {trainingDone && (
             <button
               onClick={() => navigate("results", { experimentId })}
-              className="flex items-center gap-2 rounded bg-primary px-5 py-2 font-headline-md text-headline-md text-on-primary shadow-sm transition-all hover:bg-inverse-surface active:scale-[0.98] animate-fade-in"
+              className="flex items-center gap-2 rounded bg-accent px-5 py-2 font-headline-md text-headline-md text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98] animate-fade-in"
             >
               View Results
               <Icon name="arrow_forward" size={18} />
@@ -124,7 +124,7 @@ export function Training() {
                       state === "done"
                         ? "border border-success-text bg-success-bg"
                         : state === "active"
-                          ? "border-2 border-primary bg-surface"
+                          ? "border-2 border-accent bg-surface ring-4 ring-accent/15"
                           : "border border-outline-variant bg-surface"
                     }`}
                   >
@@ -132,7 +132,7 @@ export function Training() {
                       <Icon name="check" size={16} className="pop text-success-text" />
                     )}
                     {state === "active" && (
-                      <span className="h-3 w-3 animate-pulse rounded-full bg-primary" />
+                      <span className="h-3 w-3 animate-pulse rounded-full bg-accent" />
                     )}
                   </div>
                   <div className={`pt-1 ${state === "todo" ? "opacity-50" : ""}`}>

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopAppBar } from "./TopAppBar";
 import { Disclaimer } from "./Disclaimer";
+import { useScrollReveal } from "../hooks/useScrollReveal";
 
 /**
  * Persistent application chrome: fixed sidebar + top bar + scrollable canvas +
@@ -16,6 +17,9 @@ export function AppShell({
   showSearch?: boolean;
   children: ReactNode;
 }) {
+  // Reveal [data-reveal] elements as they scroll into #doclab-main.
+  useScrollReveal();
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />

@@ -27,7 +27,7 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 bottom-0 z-40 hidden md:flex w-[220px] h-screen flex-col border-r border-border bg-background">
       {/* Brand */}
       <div className="p-5 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-accent text-accent-on flex items-center justify-center shrink-0 shadow-sm shadow-accent/20">
           <Icon name="biotech" size={20} />
         </div>
         <div className="leading-tight">
@@ -44,7 +44,7 @@ export function Sidebar() {
       <div className="px-4 pb-4">
         <button
           onClick={() => navigate("home")}
-          className="group w-full flex items-center justify-center gap-2 bg-primary text-on-primary rounded-full py-2.5 font-headline-md text-headline-md shadow-sm transition-all duration-300 ease-out hover:bg-inverse-surface hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+          className="group w-full flex items-center justify-center gap-2 bg-accent text-accent-on rounded-full py-2.5 font-headline-md text-headline-md shadow-sm shadow-accent/20 transition-all duration-300 ease-out hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
         >
           <Icon name="add" size={18} className="transition-transform duration-300 group-hover:rotate-90" />
           New Prototype
@@ -61,13 +61,13 @@ export function Sidebar() {
               onClick={() => navigate(item.route)}
               className={`group relative flex w-full items-center gap-3 rounded-full px-3 py-2 text-left transition-all duration-300 ease-out active:scale-[0.98] ${
                 active
-                  ? "bg-surface-container text-primary font-semibold"
+                  ? "bg-accent/10 text-accent font-semibold"
                   : "text-text-muted hover:translate-x-0.5 hover:bg-surface-container/60 hover:text-text-secondary"
               }`}
             >
               {/* Animated active accent bar */}
               <span
-                className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary transition-transform duration-300 ease-out ${
+                className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-accent transition-transform duration-300 ease-out ${
                   active ? "scale-y-100" : "scale-y-0"
                 }`}
               />

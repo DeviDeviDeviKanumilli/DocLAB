@@ -11,9 +11,12 @@ export function Models() {
         <section>
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="font-headline-lg text-headline-lg text-text-primary">
-                Trained models
-              </h3>
+              <div className="flex items-center gap-2.5">
+                <span className="h-7 w-1 rounded-full bg-accent" />
+                <h3 className="font-headline-lg text-headline-lg text-text-primary">
+                  Trained models
+                </h3>
+              </div>
               <p className="mt-1 font-body-md text-text-muted">
                 Saved from completed prototypes. Promote, compare, or open a
                 model card.
@@ -33,12 +36,13 @@ export function Models() {
             </div>
           </div>
 
-          <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {MODELS.map((m, i) => (
               <div
                 key={m.name}
-                style={{ "--i": i + 1 } as CSSProperties}
-                className={`flex flex-col rounded-xl border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-outline-variant hover:shadow-sm ${
+                data-reveal
+                style={{ "--reveal-delay": `${(i % 3) * 70}ms` } as CSSProperties}
+                className={`card-accent relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md hover:shadow-black/5 ${
                   m.stage === "Archive" ? "opacity-75" : ""
                 }`}
               >
@@ -61,11 +65,11 @@ export function Models() {
                     <div className="mb-1 font-label-sm text-label-sm text-text-muted">
                       {m.metricLabel}
                     </div>
-                    <div className="font-code-sm text-code-sm text-primary">
+                    <div className="font-code-sm text-code-sm font-semibold text-accent">
                       {m.metricValue}
                     </div>
                   </div>
-                  <a className="flex cursor-pointer items-center gap-1 font-body-md text-body-md text-primary hover:underline">
+                  <a className="flex cursor-pointer items-center gap-1 font-body-md text-body-md text-accent hover:underline">
                     View card <Icon name="arrow_forward" size={16} />
                   </a>
                 </div>

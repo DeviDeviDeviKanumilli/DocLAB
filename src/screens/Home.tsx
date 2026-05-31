@@ -9,6 +9,7 @@ interface Example {
   title: string;
   blurb: string;
   goal: string;
+  accent: string;
 }
 
 const EXAMPLES: Example[] = [
@@ -17,24 +18,28 @@ const EXAMPLES: Example[] = [
     title: "Predict readmission risk",
     blurb: "Using EHR-style tabular data and historical patient flows.",
     goal: "Predict hospital readmission risk from patient-style tabular data",
+    accent: "#0f766e", // teal
   },
   {
     icon: "medical_information",
     title: "Classify medical images",
     blurb: "Identify anomalies in chest X-rays from a curated public set.",
     goal: "Classify chest X-ray images as normal or abnormal",
+    accent: "#4f46e5", // indigo
   },
   {
     icon: "summarize",
     title: "Summarize medical education text",
     blurb: "Extract key insights from open clinical-education passages.",
     goal: "Summarize medical education text into concise notes",
+    accent: "#b45309", // amber
   },
   {
     icon: "table_chart",
     title: "Classify clinical tabular records",
     blurb: "Predict an outcome label from structured encounter data.",
     goal: "Classify diabetic patient encounters by readmission outcome",
+    accent: "#be185d", // rose
   },
 ];
 
@@ -61,14 +66,37 @@ export function Home() {
 
   return (
     <AppShell showSearch>
-      <div className="flex min-h-full flex-col items-center justify-center px-8 py-12">
-        <div className="w-full max-w-[720px] animate-fade-in-up">
-          <h2 className="mb-8 text-center font-headline-lg text-[28px] leading-9 font-semibold text-primary tracking-tight">
-            What healthcare AI model do you want to prototype?
+      <div className="relative flex min-h-full flex-col items-center justify-center overflow-hidden px-8 py-12">
+        {/* Decorative hero backdrop */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="bg-grid absolute inset-0" />
+          <div className="animate-aurora absolute -top-20 right-[14%] h-72 w-72 rounded-full bg-accent/12 blur-3xl" />
+          <div
+            className="animate-aurora absolute left-[6%] top-1/3 h-64 w-64 rounded-full bg-accent/[0.06] blur-3xl"
+            style={{ animationDelay: "-8s" }}
+          />
+        </div>
+
+        <div className="relative z-10 w-full max-w-[720px] animate-fade-in-up">
+          {/* Eyebrow */}
+          <div className="mb-5 flex justify-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/[0.06] px-3 py-1 font-label-sm text-label-sm font-medium text-accent">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+              </span>
+              Local-first · runs offline · no PHI ever leaves this machine
+            </span>
+          </div>
+
+          <h2 className="mb-8 text-center font-headline-lg text-[34px] leading-[1.12] font-semibold tracking-tight text-primary">
+            What healthcare AI model do you
+            <br className="hidden sm:block" /> want to{" "}
+            <span className="text-accent">prototype</span>?
           </h2>
 
           {/* Goal input */}
-          <div className="relative rounded-xl border border-border bg-surface-container-lowest p-1 shadow-sm transition-all focus-within:border-outline focus-within:ring-1 focus-within:ring-outline">
+          <div className="relative rounded-xl border border-border bg-surface-container-lowest p-1 shadow-lg shadow-black/5 transition-all focus-within:border-accent focus-within:shadow-accent/10 focus-within:ring-2 focus-within:ring-accent/30">
             <textarea
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
@@ -152,7 +180,7 @@ export function Home() {
               <button
                 onClick={() => start(goal)}
                 disabled={!goal.trim()}
-                className="flex items-center gap-2 rounded bg-primary px-5 py-2 font-headline-md text-headline-md text-on-primary transition-all hover:bg-inverse-surface active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-2 rounded bg-accent px-5 py-2 font-headline-md text-headline-md text-accent-on shadow-sm shadow-accent/20 transition-all hover:bg-accent-hover hover:shadow-md hover:shadow-accent/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
               >
                 Start Prototype
                 <Icon name="arrow_forward" size={18} />
@@ -174,18 +202,17 @@ export function Home() {
               {EXAMPLES.map((ex, i) => (
                 <button
                   key={ex.title}
-                  style={{ "--i": i + 1 } as CSSProperties}
+                  style={{ "--i": i + 1, "--color-accent": ex.accent } as CSSProperties}
                   onClick={() => {
                     setGoal(ex.goal);
                     start(ex.goal);
                   }}
-                  className="group rounded-lg border border-border bg-surface p-4 text-left transition-all hover:border-border-strong hover:bg-surface-muted hover:-translate-y-0.5"
+                  className="card-accent group relative overflow-hidden rounded-lg border border-border bg-surface p-4 text-left transition-all hover:border-accent/40 hover:bg-accent/5 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5"
                 >
                   <div className="flex items-start gap-3">
-                    <Icon
-                      name={ex.icon}
-                      className="text-text-secondary transition-colors group-hover:text-primary"
-                    />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent transition-transform duration-300 group-hover:scale-110">
+                      <Icon name={ex.icon} size={20} />
+                    </span>
                     <div>
                       <h3 className="mb-1 font-headline-md text-headline-md text-text-primary">
                         {ex.title}
