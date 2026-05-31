@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { AppShell } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { useRouter } from "../router";
@@ -44,6 +44,8 @@ export function Home() {
   const [attached, setAttached] = useState<Dataset | null>(
     (params.attachedDataset as Dataset) ?? null,
   );
+  const [upload, setUpload] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function start(text: string) {
     const trimmed = text.trim();
@@ -75,37 +77,76 @@ export function Home() {
               placeholder="I want to predict hospital readmission risk from patient-style tabular data..."
               className="h-[160px] w-full resize-none border-none bg-transparent p-4 font-body-md text-body-md text-text-primary placeholder:text-text-disabled focus:outline-none focus:ring-0"
             />
-            {/* Attached dataset chip */}
-            {attached && (
-              <div className="px-3 pb-2">
-                <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border-strong bg-surface-muted py-1.5 pl-2.5 pr-1.5 font-label-sm text-label-sm text-text-primary animate-fade-in">
-                  <Icon name="database" size={14} className="shrink-0 text-text-secondary" />
-                  <span className="truncate">{attached.name}</span>
-                  <button
-                    type="button"
-                    aria-label="Remove dataset"
-                    onClick={() => setAttached(null)}
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-text-primary"
-                  >
-                    <Icon name="close" size={14} />
-                  </button>
-                </span>
+            {/* Attached items (uploaded file + curated dataset) */}
+            {(attached || upload) && (
+              <div className="flex flex-wrap gap-2 px-3 pb-2">
+                {upload && (
+                  <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border-strong bg-surface-muted py-1.5 pl-2.5 pr-1.5 font-label-sm text-label-sm text-text-primary animate-fade-in">
+                    <Icon name="description" size={14} className="shrink-0 text-text-secondary" />
+                    <span className="truncate">{upload}</span>
+                    <button
+                      type="button"
+                      aria-label="Remove upload"
+                      onClick={() => setUpload(null)}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-text-primary"
+                    >
+                      <Icon name="close" size={14} />
+                    </button>
+                  </span>
+                )}
+                {attached && (
+                  <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border-strong bg-surface-muted py-1.5 pl-2.5 pr-1.5 font-label-sm text-label-sm text-text-primary animate-fade-in">
+                    <Icon name="database" size={14} className="shrink-0 text-text-secondary" />
+                    <span className="truncate">{attached.name}</span>
+                    <button
+                      type="button"
+                      aria-label="Remove dataset"
+                      onClick={() => setAttached(null)}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-container hover:text-text-primary"
+                    >
+                      <Icon name="close" size={14} />
+                    </button>
+                  </span>
+                )}
               </div>
             )}
 
             <div className="flex items-center justify-between px-3 pb-2">
-              <button
-                type="button"
-                onClick={() => navigate("datasets", { goal })}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-label-sm text-label-sm transition-all active:scale-[0.98] ${
-                  attached
-                    ? "border-border-strong bg-surface-muted text-text-primary"
-                    : "border-border text-text-secondary hover:border-border-strong hover:bg-surface-muted"
-                }`}
-              >
-                <Icon name={attached ? "swap_horiz" : "attach_file"} size={16} />
-                {attached ? "Change dataset" : "Attach dataset"}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Upload a local file */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.tsv,.json,.parquet,.zip"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setUpload(f.name);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Upload a file"
+                  title="Upload a local data file"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-text-secondary transition-all hover:border-border-strong hover:bg-surface-muted hover:text-text-primary active:scale-95"
+                >
+                  <Icon name="add" size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("datasets", { goal })}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-label-sm text-label-sm transition-all active:scale-[0.98] ${
+                    attached
+                      ? "border-border-strong bg-surface-muted text-text-primary"
+                      : "border-border text-text-secondary hover:border-border-strong hover:bg-surface-muted"
+                  }`}
+                >
+                  <Icon name={attached ? "swap_horiz" : "attach_file"} size={16} />
+                  {attached ? "Change dataset" : "Attach dataset"}
+                </button>
+              </div>
               <button
                 onClick={() => start(goal)}
                 disabled={!goal.trim()}
